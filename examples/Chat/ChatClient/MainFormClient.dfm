@@ -22,7 +22,7 @@ object Form5: TForm5
     Width = 137
     Height = 21
     TabOrder = 0
-    Text = 'localhost'
+    Text = '192.168.2.68'
   end
   object Edit2: TEdit
     Left = 150
@@ -52,8 +52,8 @@ object Form5: TForm5
   object Memo1: TMemo
     Left = 9
     Top = 39
-    Width = 494
-    Height = 314
+    Width = 478
+    Height = 276
     Anchors = [akLeft, akTop, akRight, akBottom]
     Color = clMenuBar
     Font.Charset = ANSI_CHARSET
@@ -67,8 +67,8 @@ object Form5: TForm5
   end
   object Memo2: TMemo
     Left = 8
-    Top = 359
-    Width = 389
+    Top = 321
+    Width = 373
     Height = 68
     Anchors = [akLeft, akRight, akBottom]
     Enabled = False
@@ -82,8 +82,8 @@ object Form5: TForm5
     OnKeyUp = Memo2KeyUp
   end
   object Button2: TButton
-    Left = 403
-    Top = 359
+    Left = 387
+    Top = 321
     Width = 100
     Height = 68
     Anchors = [akRight, akBottom]

@@ -115,9 +115,11 @@ type
     class function NewReplyToHeader(const DestinationName: string): TKeyValue;
 
     /// /////////////////////////////////////////////7
+  {$IF CompilerVersion > 15}
   const
     MESSAGE_ID: string = 'message-id';
     TRANSACTION: string = 'transaction';
+	{$IFEND}
     /// /
     function Add(Key, Value: string): IStompHeaders; overload;
     function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
@@ -181,7 +183,7 @@ type
   end;
 
   TStompClientListener = class(TThread, IStompListener)
-  strict protected
+  {$IF CompilerVersion > 15}strict{$IFEND} protected
     FStompClientListener: IStompClientListener;
     FStompClient: IStompClient;
     procedure Execute; override;
@@ -210,11 +212,21 @@ type
       AcceptVersion: TStompAcceptProtocol = STOMP_Version_1_0): IStompClient;
   end;
 
+{$IF CompilerVersion <= 15}
+const
+  MESSAGE_ID: string = 'message-id';
+  TRANSACTION: string = 'transaction';  
+{$IFEND}
+
 implementation
 
 uses
   Dateutils,
-  StompClient;
+  StompClient
+  {$IF CompilerVersion <= 15}
+  , IdGlobal
+  {$IFEND}
+  ;
 
 class function StompUtils.NewStomp(Host: string = '127.0.0.1';
   Port: Integer = DEFAULT_STOMP_PORT; ClientID: string = '';
@@ -314,7 +326,7 @@ end;
 
 function TStompFrame.MessageID: string;
 begin
-  Result := self.GetHeaders.Value(TStompHeaders.MESSAGE_ID);
+  Result := self.GetHeaders.Value({$IF CompilerVersion <= 15}StompTypes{$ELSE}TStompHeaders{$IFEND}.MESSAGE_ID);
 end;
 
 function TStompFrame.Output: string;
@@ -331,7 +343,7 @@ end;
 procedure TStompFrame.SetBody(const Value: string);
 begin
   FBody := Value;
-  FContentLength := Length(TEncoding.UTF8.GetBytes(FBody));
+  FContentLength := Length({$IF CompilerVersion <= 15}IndyTextEncoding_UTF8{$ELSE}TEncoding.UTF8{$IFEND}.GetBytes(FBody));
 end;
 
 procedure TStompFrame.SetCommand(const Value: string);
@@ -406,7 +418,7 @@ begin
       contLen := StrToInt(sContLen);
       other := StripLastChar(other, COMMAND_END);
 
-      if TEncoding.UTF8.GetByteCount(other) <> contLen then
+      if {$IF CompilerVersion <= 15}IndyTextEncoding_UTF8{$ELSE}TEncoding.UTF8{$IFEND}.GetByteCount(other) <> contLen then
       // there is still the command_end
         raise EStomp.Create('frame too short');
       Result.Body := other;

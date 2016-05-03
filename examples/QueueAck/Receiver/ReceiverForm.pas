@@ -3,9 +3,9 @@ unit ReceiverForm;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
-  System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient, StompTypes,
+  Windows, Messages, SysUtils, Variants,
+  Classes, Graphics,
+  Controls, Forms, Dialogs, StdCtrls, StompClient, StompTypes,
   ThreadReceiver;
 
 type
@@ -104,7 +104,7 @@ begin
   begin
     StompClient.Subscribe(QueueEdit.Text, amClientIndividual);
     // StompClient.Subscribe(QueueEdit.Text,amAuto);
-    ThReceiver.Start;
+    ThReceiver.Resume;
   end;
 end;
 
@@ -116,7 +116,7 @@ begin
   if StompClient.Connected then
   begin
     StompClient.Unsubscribe(QueueEdit.Text);
-    ThReceiver.Start;
+    ThReceiver.Resume;
   end;
 end;
 

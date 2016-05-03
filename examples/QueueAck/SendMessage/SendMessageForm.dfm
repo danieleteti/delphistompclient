@@ -1,9 +1,9 @@
 object SendMessageMainForm: TSendMessageMainForm
   Left = 0
   Top = 0
+  Width = 459
+  Height = 371
   Caption = 'Send Message'
-  ClientHeight = 333
-  ClientWidth = 426
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -45,7 +45,7 @@ object SendMessageMainForm: TSendMessageMainForm
   end
   object SendMessageButton: TButton
     Left = 8
-    Top = 269
+    Top = 271
     Width = 138
     Height = 56
     Caption = 'Send Message'
