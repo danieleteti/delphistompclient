@@ -1,7 +1,7 @@
 program Receiver;
 
 uses
-  Vcl.Forms,
+  Forms,
   ReceiverForm in 'ReceiverForm.pas' {ReceiverMainForm},
   ThreadReceiver in 'ThreadReceiver.pas';
 
@@ -9,7 +9,7 @@ uses
 
 begin
   Application.Initialize;
-  Application.MainFormOnTaskbar := True;
+  //Application.MainFormOnTaskbar := True;
   Application.CreateForm(TReceiverMainForm, ReceiverMainForm);
   Application.Run;
 end.

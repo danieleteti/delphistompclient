@@ -3,7 +3,7 @@ unit ThreadReceiver;
 interface
 
 uses
-  System.Classes,
+  Classes,
   StompClient,
   StompTypes;
 
@@ -56,7 +56,7 @@ implementation
     
 }
 
-uses ReceiverForm;
+uses ReceiverForm, SysUtils;
 
 { TThreadReceiver }
 
@@ -68,7 +68,7 @@ end;
 
 procedure TThreadReceiver.Execute;
 begin
-  NameThreadForDebugging('ThreadReceiver');
+  //NameThreadForDebugging('ThreadReceiver');
 
   while not Terminated do
   begin

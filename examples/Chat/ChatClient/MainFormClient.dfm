@@ -1,9 +1,9 @@
 object Form5: TForm5
   Left = 0
   Top = 0
+  Width = 527
+  Height = 473
   Caption = 'Delphi Stomp Client - CHAT DEMO - www.danieleteti.it'
-  ClientHeight = 435
-  ClientWidth = 511
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -22,7 +22,7 @@ object Form5: TForm5
     Width = 137
     Height = 21
     TabOrder = 0
-    Text = 'localhost'
+    Text = '192.168.2.68'
   end
   object Edit2: TEdit
     Left = 150

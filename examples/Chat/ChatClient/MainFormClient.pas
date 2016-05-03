@@ -85,7 +85,7 @@ begin
   if assigned(f) then
   begin
     Memo1.Lines.Add('[' + f.GetHeaders.Value('datetime') + ' ' + f.GetHeaders.Value('sender') + ']' + sLineBreak + f.GetBody);
-    if (WindowState = wsMinimized) or (Application.ActiveFormHandle <> self.Handle) then
+    if (WindowState = wsMinimized) or (Application.Active <> self.Handle) then
     begin
       fw.cbSize := SizeOf(FLASHWINFO);
       fw.hwnd := self.Handle;

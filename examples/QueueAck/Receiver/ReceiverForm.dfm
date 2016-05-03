@@ -1,9 +1,9 @@
 object ReceiverMainForm: TReceiverMainForm
   Left = 0
   Top = 0
+  Width = 511
+  Height = 493
   Caption = 'Receiver Message'
-  ClientHeight = 455
-  ClientWidth = 478
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

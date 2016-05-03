@@ -136,8 +136,11 @@ const
 
 uses
   // Windows,   // Remove windows unit for compiling on ios
-  IdGlobal,
-  Character;
+  IdGlobal
+{$IF CompilerVersion > 15}
+  , Character
+{$IFEND}  
+  ;
 
 {$ENDIF}
 
@@ -167,7 +170,8 @@ var
 begin
   Frame := TStompFrame.Create;
   Frame.SetCommand('ACK');
-  Frame.GetHeaders.Add(TStompHeaders.MESSAGE_ID, MessageID);
+  Frame.GetHeaders.Add(
+	{$IF CompilerVersion <= 15}StompTypes{$ELSE}TStompHeaders{$IFEND}.MESSAGE_ID, MessageID);
   if TransactionIdentifier <> '' then
     Frame.GetHeaders.Add('transaction', TransactionIdentifier);
   SendFrame(Frame);
@@ -502,25 +506,35 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
   function InternalReceiveINDY(ATimeout: Integer): IStompFrame;
   var
     c: char;
+{$IF CompilerVersion <= 15}
+    sb: string;
+{$ELSE}
     sb: TStringBuilder;
+{$IFEND}
     tout: boolean;
     FirstValidChar: boolean;
     // UTF8Encoding: TEncoding;
-{$IF CompilerVersion < 24}
+{$IF CompilerVersion <= 15}
+    UTF8Encoding: IIdTextEncoding;
+{$ELSEIF CompilerVersion < 24}
     UTF8Encoding: TIdTextEncoding;
 {$ELSE}
     UTF8Encoding: IIdTextEncoding;
 {$IFEND}
   begin
-{$IF CompilerVersion < 24}
+{$IF CompilerVersion <= 15}
+    UTF8Encoding := IndyTextEncoding_UTF8;
+{$ELSEIF CompilerVersion < 24}
     UTF8Encoding := TEncoding.UTF8;
-{$ELSE}
+{$ELSEIF CompilerVersion >= 24}
     UTF8Encoding := IndyTextEncoding_UTF8();
-{$ENDIF}
+{$IFEND}
     tout := False;
     Result := nil;
     try
+{$IF CompilerVersion > 15}
       sb := TStringBuilder.Create(1024 * 4);
+{$IFEND}      
       try
         FTCP.ReadTimeout := ATimeout;
         try
@@ -533,7 +547,11 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               Continue;
             FirstValidChar := True;
             if c <> CHAR0 then
-              sb.Append(c)
+              {$IF CompilerVersion <= 15}
+              sb := sb + c
+              {$ELSE}
+              sb.Append(c);
+              {$IFEND}
             else
             begin
               // FTCP.IOHandler.ReadChar(TEncoding.UTF8);
@@ -547,20 +565,20 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
           end;
           on E: Exception do
           begin
-            if sb.Length > 0 then
-              raise EStomp.Create(E.message + sLineBreak + sb.toString)
+            if {$IF CompilerVersion <= 15}Length(sb){$ELSE}sb.Length{$IFEND} > 0 then
+              raise EStomp.Create(E.message + sLineBreak + sb{$IF CompilerVersion > 15}.toString{$IFEND})
             else
               raise;
           end;
         end;
         if not tout then
         begin
-          Result := StompUtils.CreateFrame(sb.toString + CHAR0);
+          Result := StompUtils.CreateFrame(sb{$IF CompilerVersion > 15}.toString{$IFEND} + CHAR0);
           if Result.GetCommand = 'ERROR' then
             raise EStomp.Create(Result.GetHeaders.Value('message'));
         end;
       finally
-        sb.Free;
+        {$IF CompilerVersion > 15}sb.Free;{$IFEND}
       end;
     except
       on E: Exception do
@@ -632,7 +650,7 @@ begin
     FOnBeforeSendFrame(AFrame);
 
 {$IF CompilerVersion < 25}
-  FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
+  FTCP.IOHandler.write({$IF CompilerVersion <= 15}IndyTextEncoding_UTF8{$ELSE}TEncoding.UTF8{$IFEND}.GetBytes(AFrame.output));
 {$IFEND}
 {$IF CompilerVersion >= 25}
   FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
