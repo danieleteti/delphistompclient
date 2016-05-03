@@ -550,7 +550,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               {$IF CompilerVersion <= 15}
               sb := sb + c
               {$ELSE}
-              sb.Append(c);
+              sb.Append(c)
               {$IFEND}
             else
             begin

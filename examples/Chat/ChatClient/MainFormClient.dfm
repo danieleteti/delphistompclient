@@ -1,9 +1,9 @@
 object Form5: TForm5
   Left = 0
   Top = 0
-  Width = 527
-  Height = 473
   Caption = 'Delphi Stomp Client - CHAT DEMO - www.danieleteti.it'
+  ClientHeight = 435
+  ClientWidth = 511
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -52,8 +52,8 @@ object Form5: TForm5
   object Memo1: TMemo
     Left = 9
     Top = 39
-    Width = 494
-    Height = 314
+    Width = 478
+    Height = 276
     Anchors = [akLeft, akTop, akRight, akBottom]
     Color = clMenuBar
     Font.Charset = ANSI_CHARSET
@@ -67,8 +67,8 @@ object Form5: TForm5
   end
   object Memo2: TMemo
     Left = 8
-    Top = 359
-    Width = 389
+    Top = 321
+    Width = 373
     Height = 68
     Anchors = [akLeft, akRight, akBottom]
     Enabled = False
@@ -82,8 +82,8 @@ object Form5: TForm5
     OnKeyUp = Memo2KeyUp
   end
   object Button2: TButton
-    Left = 403
-    Top = 359
+    Left = 387
+    Top = 321
     Width = 100
     Height = 68
     Anchors = [akRight, akBottom]
