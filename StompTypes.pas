@@ -109,22 +109,27 @@ type
     procedure SetItems(index: Cardinal; const Value: TKeyValue);
 
   public
+    {$IFNDEF VER130}
+    const
+      MESSAGE_ID: string = 'message-id';
+      TRANSACTION: string = 'transaction';
+     {$ELSE}
+     class function MESSAGE_ID: string;
+     class function TRANSACTION: string;
+    {$ENDIF}
+    /// /
+    {$IFNDEF VER130}
     class function NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
       deprecated 'Use Subscription instead';
     class function NewPersistentHeader(const Value: Boolean): TKeyValue;
       deprecated 'Use Persistent instead';
     class function NewReplyToHeader(const DestinationName: string): TKeyValue;
       deprecated 'Use ReplyTo instead';
-
+    {$ENDIF}
     class function Subscription(const SubscriptionName: string): TKeyValue;
     class function Persistent(const Value: Boolean): TKeyValue;
     class function ReplyTo(const DestinationName: string): TKeyValue;
 
-    /// /////////////////////////////////////////////7
-  const
-    MESSAGE_ID: string = 'message-id';
-    TRANSACTION: string = 'transaction';
-    /// /
     function Add(Key, Value: string): IStompHeaders; overload;
     function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
     function Value(Key: string): string;
@@ -187,7 +192,7 @@ type
   end;
 
   TStompClientListener = class(TThread, IStompListener)
-  strict protected
+  {$IFNDEF VER130}strict{$ENDIF} protected
     FStompClientListener: IStompClientListener;
     FStompClient: IStompClient;
     procedure Execute; override;
@@ -207,7 +212,9 @@ type
     class function StripLastChar(Buf: string; LastChar: char): string;
     class function CreateFrame(Buf: string): TStompFrame;
     class function AckModeToStr(AckMode: TAckMode): string;
+    {$IFNDEF VER130}
     class function NewHeaders: IStompHeaders; deprecated 'Use Headers instead';
+    {$ENDIF}
     class function Headers: IStompHeaders;
     class function NewFrame: IStompFrame;
     class function TimestampAsDateTime(const HeaderValue: string): TDateTime;
@@ -225,7 +232,9 @@ function NewStompClient(Host: string = '127.0.0.1';
 implementation
 
 uses
+  {$IFNDEF VER130}
   Dateutils,
+  {$ENDIF}
   StompClient;
 
 function NewStompClient(Host: string; Port: Integer; ClientID: string;
@@ -256,6 +265,7 @@ begin
   Result := Copy(Buf, 1, p - 1);
 end;
 
+{$IFNDEF VER130}
 class function TStompHeaders.NewDurableSubscriptionHeader(const SubscriptionName
   : string): TKeyValue;
 begin
@@ -279,11 +289,17 @@ begin
   Result := Headers;
 end;
 
+{$ENDIF}
+
 class function StompUtils.TimestampAsDateTime(const HeaderValue: string)
   : TDateTime;
 begin
+  {$IFDEF VER130}
+  Result := EncodeDate(1970,1,1) + EncodeTime(0,0,0,0) + StrToInt64(HeaderValue) / 86400000;
+  {$ELSE}
   Result := EncodeDateTime(1970, 1, 1, 0, 0, 0, 0) + StrToInt64(HeaderValue)
     / 86400000;
+  {$ENDIF}
 end;
 
 class function StompUtils.AckModeToStr(AckMode: TAckMode): string;
@@ -347,7 +363,11 @@ end;
 procedure TStompFrame.SetBody(const Value: string);
 begin
   FBody := Value;
+  {$IFDEF VER130}
+  FContentLength := Length(FBody);
+  {$ELSE}
   FContentLength := Length(TEncoding.UTF8.GetBytes(FBody));
+  {$ENDIF}
 end;
 
 procedure TStompFrame.SetCommand(const Value: string);
@@ -422,7 +442,11 @@ begin
       contLen := StrToInt(sContLen);
       other := StripLastChar(other, COMMAND_END);
 
+      {$IFDEF VER130}
+      if Length(other) <> contLen then
+      {$ELSE}
       if TEncoding.UTF8.GetByteCount(other) <> contLen then
+      {$ENDIF}
         // there is still the command_end
         raise EStomp.Create('frame too short');
       Result.Body := other;
@@ -538,6 +562,21 @@ begin
 end;
 
 class function TStompHeaders.Persistent(const Value: Boolean): TKeyValue;
+  {$IFDEF VER130}
+    function BoolToStr(pbValor: Boolean; pbUseStrings: Boolean): string;
+    begin
+      if pbUseStrings then
+        if pbValor then
+          Result := 'true'
+        else
+          Result := 'false'
+      else
+        if pbValor then
+          Result := '1'
+        else
+          Result := '0';
+    end;
+  {$ENDIF}
 begin
   Result.Key := 'persistent';
   Result.Value := LowerCase(BoolToStr(Value, true));
@@ -623,6 +662,10 @@ end;
 
 function TStompClientListener.QueryInterface(const IID: TGUID; out Obj)
   : HRESULT;
+{$IFDEF VER130}
+  const
+    E_NOINTERFACE = HResult($80004002);
+{$ENDIF}
 begin
   Result := E_NOINTERFACE;
 end;
@@ -643,5 +686,18 @@ function TStompClientListener._Release: Integer;
 begin
   Result := -1;
 end;
+
+{$IFDEF VER130}
+class function TStompHeaders.MESSAGE_ID: string;
+begin
+  result := 'message-id';
+end;
+
+class function TStompHeaders.TRANSACTION: string;
+begin
+  result := 'transaction';
+end;
+
+{$ENDIF}
 
 end.

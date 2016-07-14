@@ -6,6 +6,7 @@
 // Daniel Gaspary: dgaspary@gmail.com
 // Oliver Marr: oliver.sn@wmarr.de
 // Marco Mottadelli: mottadelli75@gmail.com
+// Felipe Caputo: felipe.caputo@gmail.com
 // WebSite: www.danieleteti.it
 // email:d.teti@bittime.it
 // *******************************************************
@@ -32,8 +33,12 @@ uses
 
 {$IFNDEF USESYNAPSE}
   IdTCPClient,
-  IdException,
+  {$IFNDEF VER130}
+  IdException,   
   IdExceptionCore,
+  {$ELSE}
+  Windows,
+  {$ENDIF}    
   IdHeaderList,
 
 {$ELSE}
@@ -133,14 +138,36 @@ const
   CHAR0 = #0;
 
 {$ELSE}
+  {$IFDEF VER130}
+  //Delphi 5 doesn't have this constants
+  const
+    LF = #10;
+    sLineBreak = #13#10;
+  {$ENDIF}
+{$ENDIF}
 
-
+{$IFNDEF VER130}
 uses
   // Windows,   // Remove windows unit for compiling on ios
   IdGlobal,
   IdGlobalProtocols,
   Character;
 
+{$ENDIF}
+
+{$IFDEF VER130} //Delphi 5 doesn't have string builder
+type
+  TStringBuilder = class
+  private
+    FsString: String;
+    function GetLength: Integer;
+  public
+    constructor Create(size: Integer);
+
+    procedure Append(const psTexto: string);
+    property Length: Integer read GetLength;
+    property toString: string read FsString;
+  end;
 {$ENDIF}
 
 { TStompClient }
@@ -241,8 +268,14 @@ begin
     FSynapseConnected := True;
 
 {$ELSE}
-    FTCP.Connect(Host, Port);
-    FTCP.IOHandler.MaxLineLength := MaxInt;
+    {$IFDEF VER130}
+      FTCP.Host := Host;
+      FTCP.Port := Port;
+      FTCP.Connect();
+    {$ELSE}
+      FTCP.Connect(Host, Port);
+      FTCP.IOHandler.MaxLineLength := MaxInt;
+    {$ENDIF}
 
 {$ENDIF}
     Frame := TStompFrame.Create;
@@ -512,37 +545,52 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
   var
     s: string;
     lSBuilder: TStringBuilder;
+    {$IFNDEF VER130}
+    Charset: string;
+    {$ENDIF}
     Headers: TIdHeaderList;
     ContentLength: Integer;
-    Charset: string;
 
-{$IF CompilerVersion < 24}
-    Encoding: TIdTextEncoding;
-    FreeEncoding: boolean;
-{$ELSE}
-    Encoding: IIdTextEncoding;
-{$ENDIF}
+
+    {$IFNDEF VER130}
+      {$IF CompilerVersion < 24}
+          Encoding: TIdTextEncoding;
+          FreeEncoding: boolean;
+      {$ELSEIF CompilerVersion >= 24}
+          Encoding: IIdTextEncoding;
+      {$IFEND}
+    {$ENDIF}
   begin
     Result := nil;
     lSBuilder := TStringBuilder.Create(1024 * 4);
     try
       FTCP.ReadTimeout := ATimeout;
+      {$IFNDEF VER130}
       FTCP.Socket.DefStringEncoding :=
-{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+      {$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSEIF CompilerVersion >= 24}IndyTextEncoding_UTF8{$IFEND};
+      {$ENDIF};
 
       try
         // read command line
         repeat
+          {$IFDEF VER130}
+          s := FTCP.ReadLn(#10, ATimeout);
+          {$ELSE}
           s := FTCP.Socket.ReadLn;
+          {$ENDIF}
         until s <> '';
         lSBuilder.Append(s + LF);
 
         // read headers
-        Headers := TIdHeaderList.Create(QuotePlain);
+        Headers := TIdHeaderList.Create({$IFNDEF VER130}QuotePlain{$ENDIF});
 
         try
           repeat
+            {$IFDEF VER130}
+            s := FTCP.ReadLn;
+            {$ELSE}
             s := FTCP.Socket.ReadLn;
+            {$ENDIF}
             lSBuilder.Append(s + LF);
             if s = '' then
               Break;
@@ -553,54 +601,75 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
           //
           // NOTE: non-text data really should be read as a Stream instead of a String!!!
           //
+{$IFNDEF VER130}
+         if IsHeaderMediaType(Headers.Values['content-type'], 'text') then
+         begin
+           Charset := Headers.Params['content-type', 'charset'];
 
-          if IsHeaderMediaType(Headers.Values['content-type'], 'text') then
-          begin
-            Charset := Headers.Params['content-type', 'charset'];
-            if Charset = '' then
-              Charset := 'utf-8';
-            Encoding := CharsetToEncoding(Charset);
-{$IF CompilerVersion < 24}
-            FreeEncoding := True;
-{$ENDIF}
-          end
-          else
-          begin
-            Encoding := IndyTextEncoding_8Bit();
-{$IF CompilerVersion < 24}
-            FreeEncoding := False;
-{$ENDIF}
-          end;
+           if Charset = '' then
+             Charset := 'utf-8';
+           Encoding := CharsetToEncoding(Charset);
+  {$IF CompilerVersion < 24}
+             FreeEncoding := True;
+  {$IFEND}
+         end
+         else
+         begin
 
-{$IF CompilerVersion < 24}
-          try
+           Encoding := IndyTextEncoding_8Bit();
+    {$IF CompilerVersion < 24}
+           FreeEncoding := False;
+    {$IFEND}
+         end;
+
+    {$IF CompilerVersion < 24}
+         try
+    {$IFEND}
 {$ENDIF}
             if Headers.IndexOfName('content-length') <> -1 then
             begin
               // length specified, read exactly that many bytes
+              {$IFDEF VER130}
+              ContentLength := StrToIntDef(Headers.Values['content-length'],0);
+              {$ELSE}
               ContentLength := IndyStrToInt(Headers.Values['content-length']);
+              {$ENDIF}
               if ContentLength > 0 then
               begin
+                {$IFDEF VER130}
+                s := FTCP.ReadString(ContentLength);
+                {$ELSE}
                 s := FTCP.Socket.ReadString(ContentLength, Encoding);
+                {$ENDIF}
                 lSBuilder.Append(s);
               end;
               // frame must still be terminated by a null
+              {$IFDEF VER130}
+              FTCP.ReadLn(#0);
+              {$ELSE}
               FTCP.Socket.ReadLn(#0);
+              {$ENDIF}
             end
             else
 
             begin
               // no length specified, body terminated by frame terminating null
-              s := FTCP.Socket.ReadLn(#0, Encoding);
+              {$IFDEF VER130}
+              FTCP.ReadLn(#0);
+              {$ELSE}
+              FTCP.Socket.ReadLn(#0);
+              {$ENDIF}
               lSBuilder.Append(s);
 
             end;
             lSBuilder.Append(#0);
-{$IF CompilerVersion < 24}
+{$IFNDEF VER130}            
+  {$IF CompilerVersion < 24}
           finally
             if FreeEncoding then
               Encoding.Free;
           end;
+  {$IFEND}
 {$ENDIF}
         finally
           Headers.Free;
@@ -682,13 +751,16 @@ begin
   // FTCP.IOHandler.write(TEncoding.ASCII.GetBytes(AFrame.output));
   if Assigned(FOnBeforeSendFrame) then
     FOnBeforeSendFrame(AFrame);
-
-{$IF CompilerVersion < 25}
-  FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
-{$IFEND}
-{$IF CompilerVersion >= 25}
-  FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
-{$IFEND}
+{$IFDEF VER130}
+  FTCP.write(AFrame.Output);
+{$ELSE}
+  {$IF CompilerVersion < 25}
+    FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
+  {$IFEND}
+  {$IF CompilerVersion >= 25}
+    FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
+  {$IFEND}
+{$ENDIF}
   if Assigned(FOnAfterSendFrame) then
     FOnAfterSendFrame(AFrame);
 
@@ -741,5 +813,24 @@ begin
   Frame.GetHeaders.Add('destination', Queue);
   SendFrame(Frame);
 end;
+
+{$IFDEF VER130}
+{ TStringBuilder }
+
+procedure TStringBuilder.Append(const psTexto: string);
+begin
+  FsString := FsString + psTexto;
+end;
+
+constructor TStringBuilder.Create(size: Integer);
+begin
+  FsString := '';
+end;
+
+function TStringBuilder.GetLength: Integer;
+begin
+  Result := System.Length(FsString);
+end;
+{$ENDIF}
 
 end.
