@@ -340,22 +340,45 @@ procedure TStompClient.Disconnect;
 var
   Frame: IStompFrame;
 begin
-  if Connected then
-  begin
-    Frame := TStompFrame.Create;
-    Frame.SetCommand('DISCONNECT');
-    SendFrame(Frame);
+  try
+    if Connected then
+    begin
+
+      try
+        Frame := TStompFrame.Create;
+        Frame.SetCommand('DISCONNECT');
+        SendFrame(Frame);
+      except
+        on E: EIdException do
+        begin
+{$IFDEF USESYNAPSE}
+          // nop
+{$ELSE}
+          FTCP.Socket.Close;
+{$ENDIF}
+          raise;
+        end;
+      end;
 
 {$IFDEF USESYNAPSE}
-    FSynapseTCP.CloseSocket;
-    FSynapseConnected := False;
+      FSynapseTCP.CloseSocket;
+      FSynapseConnected := False;
 
 {$ELSE}
-    FTCP.Disconnect;
-
+      try
+        FTCP.Disconnect;
+      except
+        on E: EIdException do
+        begin
+          FTCP.Socket.Close;
+          raise;
+        end;
+      end;
 {$ENDIF}
+    end;
+  finally
+    DeInit;
   end;
-  DeInit;
 end;
 
 function TStompClient.FormatErrorFrame(const AErrorFrame: IStompFrame): string;
