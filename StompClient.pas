@@ -533,14 +533,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
     FreeEncoding: boolean;
 {$ELSE}
     Encoding: IIdTextEncoding;
-{$ENDIF}
+{$IFEND}
   begin
     Result := nil;
     lSBuilder := TStringBuilder.Create(1024 * 4);
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
-{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$IFEND};
 
       try
         // read command line
@@ -576,19 +576,19 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             Encoding := CharsetToEncoding(Charset);
 {$IF CompilerVersion < 24}
             FreeEncoding := True;
-{$ENDIF}
+{$IFEND}
           end
           else
           begin
-            Encoding := IndyTextEncoding_8Bit();
+            Encoding := Indy8BitEncoding;
 {$IF CompilerVersion < 24}
             FreeEncoding := False;
-{$ENDIF}
+{$IFEND}
           end;
 
 {$IF CompilerVersion < 24}
           try
-{$ENDIF}
+{$IFEND}
             if Headers.IndexOfName('content-length') <> -1 then
             begin
               // length specified, read exactly that many bytes
@@ -615,7 +615,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             if FreeEncoding then
               Encoding.Free;
           end;
-{$ENDIF}
+{$IFEND}
         finally
           Headers.Free;
         end;
