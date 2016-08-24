@@ -652,6 +652,9 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
         end;
       end;
       Result := StompUtils.CreateFrame(lSBuilder.toString);
+      // ATRLP: StompUtils.CreateFrame hides STOMP exceptions and returns nil
+      if Result = nil then
+        Exit;
       if Result.GetCommand = 'ERROR' then
         raise EStomp.Create(FormatErrorFrame(Result));
     finally
