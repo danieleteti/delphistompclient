@@ -376,22 +376,45 @@ procedure TStompClient.Disconnect;
 var
   Frame: IStompFrame;
 begin
-  if Connected then
-  begin
-    Frame := TStompFrame.Create;
-    Frame.SetCommand('DISCONNECT');
-    SendFrame(Frame);
+  try
+    if Connected then
+    begin
+
+      try
+        Frame := TStompFrame.Create;
+        Frame.SetCommand('DISCONNECT');
+        SendFrame(Frame);
+      except
+        on E: EIdException do
+        begin
+{$IFDEF USESYNAPSE}
+          // nop
+{$ELSE}
+          FTCP.Socket.Close;
+{$ENDIF}
+          raise;
+        end;
+      end;
 
 {$IFDEF USESYNAPSE}
-    FSynapseTCP.CloseSocket;
-    FSynapseConnected := False;
+      FSynapseTCP.CloseSocket;
+      FSynapseConnected := False;
 
 {$ELSE}
-    FTCP.Disconnect;
-
+      try
+        FTCP.Disconnect;
+      except
+        on E: EIdException do
+        begin
+          FTCP.Socket.Close;
+          raise;
+        end;
+      end;
 {$ENDIF}
+    end;
+  finally
+    DeInit;
   end;
-  DeInit;
 end;
 
 function TStompClient.FormatErrorFrame(const AErrorFrame: IStompFrame): string;
@@ -570,14 +593,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
     FreeEncoding: boolean;
 {$ELSE}
     Encoding: IIdTextEncoding;
-{$ENDIF}
+{$IFEND}
   begin
     Result := nil;
     lSBuilder := TStringBuilder.Create(1024 * 4);
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
-{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$IFEND};
 
       try
         // read command line
@@ -614,19 +637,19 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             Encoding := CharsetToEncoding(Charset);
 {$IF CompilerVersion < 24}
             FreeEncoding := True;
-{$ENDIF}
+{$IFEND}
           end
           else
           begin
-            Encoding := IndyTextEncoding_8Bit();
+            Encoding := Indy8BitEncoding;
 {$IF CompilerVersion < 24}
             FreeEncoding := False;
-{$ENDIF}
+{$IFEND}
           end;
 
 {$IF CompilerVersion < 24}
           try
-{$ENDIF}
+{$IFEND}
             if Headers.IndexOfName('content-length') <> -1 then
             begin
               // length specified, read exactly that many bytes
@@ -653,7 +676,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             if FreeEncoding then
               Encoding.Free;
           end;
-{$ENDIF}
+{$IFEND}
         finally
           Headers.Free;
         end;
@@ -667,6 +690,9 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
         end;
       end;
       Result := StompUtils.CreateFrame(lSBuilder.toString);
+      // ATRLP: StompUtils.CreateFrame hides STOMP exceptions and returns nil
+      if Result = nil then
+        Exit;
       if Result.GetCommand = 'ERROR' then
         raise EStomp.Create(FormatErrorFrame(Result));
     finally
