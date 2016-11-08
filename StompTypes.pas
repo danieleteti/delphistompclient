@@ -409,13 +409,14 @@ begin
       contLen := StrToInt(sContLen);
       other := StripLastChar(other, COMMAND_END);
 
-      {ATRLP ignore bad length
-      if TEncoding.UTF8.GetByteCount(other) <> contLen then
+      { ATRLP ignore bad length
+        if TEncoding.UTF8.GetByteCount(other) <> contLen then
         // there is still the command_end
         raise EStomp.Create('frame too short');
-        }
-other:=        UTF8Decode(other);
-//        TEncoding.UTF8.UTF8.
+      }
+      other := UTF8ToUnicodeString(other);
+      // TEncoding.UTF8.UTF8.
+      // other:=TEncoding.UTF8.GetString(other,0,Length(other));
       Result.Body := other;
     end
     else
