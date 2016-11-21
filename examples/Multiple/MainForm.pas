@@ -13,7 +13,7 @@ uses
   Vcl.Forms,
   Vcl.Dialogs,
   Vcl.StdCtrls,
-  StompTypes;
+  StompClient;
 
 type
   TForm4 = class(TForm, IStompClientListener)
@@ -40,8 +40,6 @@ var
   Form4: TForm4;
 
 implementation
-
-uses StompClient;
 
 {$R *.dfm}
 

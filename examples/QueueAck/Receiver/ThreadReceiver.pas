@@ -4,8 +4,7 @@ interface
 
 uses
   System.Classes,
-  StompClient,
-  StompTypes;
+  StompClient;
 
 type
   TThreadReceiver = class(TThread)

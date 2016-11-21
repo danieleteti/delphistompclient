@@ -6,7 +6,6 @@ program HeartBeatsTest;
 
 
 uses
-  StompTypes in '..\..\StompTypes.pas',
   StompClient in '..\..\StompClient.pas', System.Classes, System.SysUtils;
 
 procedure Main;
