@@ -107,6 +107,7 @@ type
     function Receive(ATimeout: Integer): IStompFrame; overload;
     procedure Receipt(const ReceiptID: string);
     procedure Connect(Host: string = '127.0.0.1'; Port: Integer = 61613;
+      VirtualHost: string = '';
       ClientID: string = '';
       AcceptVersion: TStompAcceptProtocol = Ver_1_0);
     function Clone: IStompClient;
@@ -282,6 +283,7 @@ type
     FOnAfterSendFrame: TSenderFrameEvent;
     FHost: string;
     FPort: Integer;
+    FVirtualHost: string;
     FClientID: string;
 
     FUseSSL   : boolean;      // SSL
@@ -335,7 +337,9 @@ type
     function Receive(ATimeout: Integer): IStompFrame; overload;
     procedure Receipt(const ReceiptID: string);
     procedure Connect(Host: string = '127.0.0.1';
-      Port: Integer = DEFAULT_STOMP_PORT; ClientID: string = '';
+      Port: Integer = DEFAULT_STOMP_PORT;
+      VirtualHost: string = '';
+      ClientID: string = '';
       AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
       Ver_1_0);
     procedure Disconnect;
@@ -357,7 +361,9 @@ type
     /// ////////////
     constructor Create; overload; virtual;
     class function CreateAndConnect(Host: string = '127.0.0.1';
-      Port: Integer = DEFAULT_STOMP_PORT; ClientID: string = '';
+      Port: Integer = DEFAULT_STOMP_PORT;
+      VirtualHost: string = '';
+      ClientID: string = '';
       AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
       Ver_1_0): IStompClient; overload; virtual;
     destructor Destroy; override;
@@ -943,8 +949,7 @@ begin
   Result := TStompClient.Create;
   Result.SetUserName(FUserName).SetPassword(FPassword);
   TStompClient(Result).ConnectionTimeout := FConnectionTimeout;
-  TStompClient(Result).Connect(FHost, FPort, FClientID, FAcceptVersion);
-
+  TStompClient(Result).Connect(FHost, FPort, FVirtualHost, FClientID, FAcceptVersion);
 end;
 
 procedure TStompClient.CommitTransaction(const TransactionIdentifier: string);
@@ -966,14 +971,15 @@ begin
       [TransactionIdentifier]);
 end;
 
-procedure TStompClient.Connect(Host: string; Port: Integer; ClientID: string;
-  AcceptVersion: TStompAcceptProtocol);
+procedure TStompClient.Connect(Host: string; Port: Integer; VirtualHost: string;
+  ClientID: string; AcceptVersion: TStompAcceptProtocol);
 var
   Frame: IStompFrame;
   lHeartBeat: string;
 begin
   FHost := Host;
   FPort := Port;
+  FVirtualHost := VirtualHost;
   FClientID := ClientID;
   FAcceptVersion := AcceptVersion;
 
@@ -1023,6 +1029,11 @@ begin
     else
     begin
       Frame.Headers.Add('accept-version', '1.0'); // stomp 1.0
+    end;
+
+    if VirtualHost <> '' then
+    begin
+      Frame.Headers.Add('host', VirtualHost);
     end;
 
     Frame.Headers.Add('login', FUserName).Add('passcode', FPassword);
@@ -1079,10 +1090,11 @@ begin
 end;
 
 class function TStompClient.CreateAndConnect(Host: string; Port: Integer;
-  ClientID: string; AcceptVersion: TStompAcceptProtocol): IStompClient;
+  VirtualHost: string; ClientID: string;
+  AcceptVersion: TStompAcceptProtocol): IStompClient;
 begin
   Result := TStompClient.Create;
-  Result.Connect(Host, Port, ClientID, AcceptVersion);
+  Result.Connect(Host, Port, VirtualHost, ClientID, AcceptVersion);
 end;
 
 constructor TStompClient.Create;
