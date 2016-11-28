@@ -20,11 +20,10 @@ type
     AutomaticSendCheckBox: TCheckBox;
     procedure SendMessageButtonClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
     procedure AutomaticSendTimerTimer(Sender: TObject);
     procedure AutomaticSendCheckBoxClick(Sender: TObject);
   private
-    StompClient: TStompClient;
+    StompClient: IStompClient;
     procedure BeforeSendFrame(AFrame: IStompFrame);
     procedure Send;
   public
@@ -57,13 +56,8 @@ end;
 
 procedure TSendMessageMainForm.FormCreate(Sender: TObject);
 begin
-  StompClient := TStompClient.Create;
+  StompClient := StompUtils.StompClient;
   StompClient.OnBeforeSendFrame := BeforeSendFrame;
-end;
-
-procedure TSendMessageMainForm.FormDestroy(Sender: TObject);
-begin
-  StompClient.Free;
 end;
 
 procedure TSendMessageMainForm.AutomaticSendTimerTimer(Sender: TObject);

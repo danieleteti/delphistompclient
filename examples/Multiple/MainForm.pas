@@ -64,7 +64,7 @@ begin
       i: Integer;
       stomp: IStompClient;
     begin
-      stomp := TStompClient.CreateAndConnect;
+      stomp := StompUtils.StompClientAndConnect;
       i := 1;
       while True do
       begin
@@ -85,11 +85,11 @@ end;
 procedure TForm4.FormCreate(Sender: TObject);
 begin
   FFormClosing := False;
-  FSTOMPClient := TStompClient.CreateAndConnect;
+  FSTOMPClient := StompUtils.StompClientAndConnect;
   FSTOMPClient.Subscribe('/topic/danieleteti',
     amAuto,
     StompUtils.Headers.Add('include-seq', 'seq'));
-  FSTOMPListener := TStompClientListener.Create(FSTOMPClient, Self);
+  FSTOMPListener := StompUtils.CreateListener(FSTOMPClient, Self);
 end;
 
 procedure TForm4.FormDestroy(Sender: TObject);

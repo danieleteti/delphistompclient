@@ -38,7 +38,7 @@ implementation
 procedure TForm5.Button1Click(Sender: TObject);
 begin
   roomname := '/topic/' + Edit2.Text;
-  stomp := TStompClient.Create;
+  stomp := StompUtils.StompClient;
 //  stomp.SetUserName('admin');
 //  stomp.SetPassword('password');
   stomp.Connect(Edit1.Text);
@@ -59,10 +59,10 @@ end;
 procedure TForm5.Button2Click(Sender: TObject);
 begin
   stomp.Send(roomname, Memo2.Lines.Text,
-    StompUtils.NewHeaders
+    StompUtils.Headers
       .Add('sender', Edit3.Text)
       .Add('datetime', formatdatetime('yyyy/mm/dd hh:nn:ss', now))
-      .Add(TStompHeaders.NewPersistentHeader(true))
+      .Add(StompUtils.NewPersistentHeader(true))
       );
   Memo2.Lines.Clear;
 end;

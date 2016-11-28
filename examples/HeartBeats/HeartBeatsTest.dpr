@@ -15,12 +15,12 @@ var
 const
   DESTINATION = '/topic/pippo';
 begin
-  lSTOMP := TStompClient.Create;
+  lSTOMP := StompUtils.StompClient;
   lSTOMP
     .SetHeartBeat(500, 0) // very low outgoing heartbeat interval
     .SetUserName('guest')
     .SetPassword('guest')
-    .Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+    .Connect('127.0.0.1', 61613, '', '', TStompAcceptProtocol.Ver_1_1);
   WriteLn('PROTOCOL: ', lSTOMP.GetProtocolVersion);
   WriteLn('SERVER  : ', lSTOMP.GetServer);
   WriteLn('SESSION : ', lSTOMP.GetSession);
@@ -33,11 +33,11 @@ begin
       lSTOMP: IStompClient;
       I: Integer;
     begin
-      lSTOMP := TStompClient.Create;
+      lSTOMP := StompUtils.StompClient;
       lSTOMP
         .SetUserName('guest')
         .SetPassword('guest')
-        .Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+        .Connect('127.0.0.1', 61613, '', '', TStompAcceptProtocol.Ver_1_1);
       for I := 1 to 10 do
       begin
         lSTOMP.Send(DESTINATION, TGuid.NewGuid.ToString + ' ' + DateTimeToStr(now));

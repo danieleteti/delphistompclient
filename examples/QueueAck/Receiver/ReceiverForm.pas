@@ -30,7 +30,7 @@ type
     procedure UnsubscribeButtonClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
   private
-    StompClient: TStompClient;
+    StompClient: IStompClient;
     StompFrame: IStompFrame;
     ThReceiver: TThreadReceiver;
     procedure BeforeSendFrame(AFrame: IStompFrame);
@@ -44,6 +44,7 @@ implementation
 
 {$R *.dfm}
 
+uses System.UITypes;
 
 procedure TReceiverMainForm.BeforeSendFrame(AFrame: IStompFrame);
 begin
@@ -52,7 +53,7 @@ end;
 
 procedure TReceiverMainForm.FormCreate(Sender: TObject);
 begin
-  StompClient := TStompClient.Create;
+  StompClient := StompUtils.StompClient;
   try
     StompClient.Connect;
   except
@@ -71,7 +72,6 @@ end;
 procedure TReceiverMainForm.FormDestroy(Sender: TObject);
 begin
   ThReceiver.Free;
-  StompClient.Free;
 end;
 
 procedure TReceiverMainForm.SendAckButtonClick(Sender: TObject);
