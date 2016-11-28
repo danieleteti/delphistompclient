@@ -70,7 +70,6 @@ type
 
   PKeyValue = ^TKeyValue;
 
-
   IStompHeaders = interface
     ['{BD087D9D-0576-4C35-88F9-F5D6348E3894}']
     function Add(Key, Value: string): IStompHeaders; overload;
@@ -146,50 +145,57 @@ type
     property OnConnect: TStompConnectNotifyEvent read GetOnConnect write SetOnConnect;
   end;
 
-  TStompHeaders = class(TInterfacedObject, IStompHeaders)
-  private
-    FList: TList;
-    function GetItems(index: Cardinal): TKeyValue;
-    procedure SetItems(index: Cardinal; const Value: TKeyValue);
-
-  public
-    class function NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
-      deprecated 'Use Subscription instead';
-    class function NewPersistentHeader(const Value: Boolean): TKeyValue;
-      deprecated 'Use Persistent instead';
-    class function NewReplyToHeader(const DestinationName: string): TKeyValue;
-      deprecated 'Use ReplyTo instead';
-
-    class function Subscription(const SubscriptionName: string): TKeyValue;
-    class function Persistent(const Value: Boolean): TKeyValue;
-    class function Durable(const Value: Boolean): TKeyValue;
-    class function ReplyTo(const DestinationName: string): TKeyValue;
-
-    /// /////////////////////////////////////////////7
-  const
-    MESSAGE_ID: string = 'message-id';
-    TRANSACTION: string = 'transaction';
-    REPLY_TO: string = 'reply-to';
-    AUTO_DELETE: string = 'auto-delete';
-    // RabbitMQ specific headers
-    PREFETCH_COUNT: string = 'prefetch-count';
-    X_MESSAGE_TTL: string = 'x-message-ttl';
-    X_EXPIRES: string = 'x-expires';
-    /// /
-    function Add(Key, Value: string): IStompHeaders; overload;
-    function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
-    function Value(Key: string): string;
-    function Remove(Key: string): IStompHeaders;
-    function IndexOf(Key: string): Integer;
-    function Count: Cardinal;
-    function GetAt(const index: Integer): TKeyValue;
-    constructor Create;
-    destructor Destroy; override;
-    function Output: string;
-    property Items[index: Cardinal]: TKeyValue read GetItems
-      write SetItems; default;
+  TAddress = record
+    Host: string;
+    Port: Integer;
+    UserName: string;
+    Password: string;
   end;
 
+  TAddresses = array of TAddress;
+
+  IStompListener = interface
+    ['{CB3EB297-8616-408E-A0B2-7CCC11224DBC}']
+    procedure StopListening;
+    procedure StartListening;
+  end;
+
+  IStompClientListener = interface
+    ['{C4C0D932-8994-43FB-9D32-A03FE86AEFE4}']
+    procedure OnMessage(StompFrame: IStompFrame; var TerminateListener: Boolean);
+    procedure OnListenerStopped(StompClient: IStompClient);
+  end;
+
+  StompUtils = class
+    class function StripLastChar(Buf: string; LastChar: char): string;
+    class function CreateFrame(Buf: string): IStompFrame;
+    class function AckModeToStr(AckMode: TAckMode): string;
+    class function NewHeaders: IStompHeaders; deprecated 'Use Headers instead';
+    class function Headers: IStompHeaders;
+    class function NewFrame: IStompFrame;
+    class function TimestampAsDateTime(const HeaderValue: string): TDateTime;
+  end;
+
+implementation
+
+{$IFDEF FPC}
+
+
+const
+  CHAR0 = #0;
+
+{$ELSE}
+
+
+uses
+  // Windows,   // Remove windows unit for compiling on ios
+  IdGlobal,
+  IdGlobalProtocols,
+  Character, Winapi.Windows;
+
+{$ENDIF}
+
+type
   TStompFrame = class(TInterfacedObject, IStompFrame)
   private
     FCommand: string;
@@ -217,27 +223,6 @@ type
     property Headers: IStompHeaders read GetHeaders write SetHeaders;
   end;
 
-  TAddress = record
-    Host: string;
-    Port: Integer;
-    UserName: string;
-    Password: string;
-  end;
-
-  TAddresses = array of TAddress;
-
-  IStompListener = interface
-    ['{CB3EB297-8616-408E-A0B2-7CCC11224DBC}']
-    procedure StopListening;
-    procedure StartListening;
-  end;
-
-  IStompClientListener = interface
-    ['{C4C0D932-8994-43FB-9D32-A03FE86AEFE4}']
-    procedure OnMessage(StompFrame: IStompFrame; var TerminateListener: Boolean);
-    procedure OnListenerStopped(StompClient: IStompClient);
-  end;
-
   TStompClientListener = class(TInterfacedObject, IStompListener)
   strict private
     FReceiverThread: TThread;
@@ -254,17 +239,6 @@ type
     procedure StopListening;
   end;
 
-type
-  StompUtils = class
-    class function StripLastChar(Buf: string; LastChar: char): string;
-    class function CreateFrame(Buf: string): TStompFrame;
-    class function AckModeToStr(AckMode: TAckMode): string;
-    class function NewHeaders: IStompHeaders; deprecated 'Use Headers instead';
-    class function Headers: IStompHeaders;
-    class function NewFrame: IStompFrame;
-    class function TimestampAsDateTime(const HeaderValue: string): TDateTime;
-  end;
-
   TReceiverThread = class(TThread)
   private
     FStompClient: IStompClient;
@@ -275,11 +249,11 @@ type
     constructor Create(StompClient: IStompClient; StompClientListener: IStompClientListener);
   end;
 
-  { TStompClient }
-
   TSenderFrameEvent = procedure(AFrame: IStompFrame) of object;
 
   THeartBeatThread = class;
+
+  { TStompClient }
 
   TStompClient = class(TInterfacedObject, IStompClient)
   private
@@ -425,24 +399,47 @@ type
     property OnHeartBeatError: TNotifyEvent read FOnHeartBeatError write FOnHeartBeatError;
   end;
 
-implementation
+  TStompHeaders = class(TInterfacedObject, IStompHeaders)
+  private
+    FList: TList;
+    function GetItems(index: Cardinal): TKeyValue;
+    procedure SetItems(index: Cardinal; const Value: TKeyValue);
 
-{$IFDEF FPC}
+  public
+    class function NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
+      deprecated 'Use Subscription instead';
+    class function NewPersistentHeader(const Value: Boolean): TKeyValue;
+      deprecated 'Use Persistent instead';
+    class function NewReplyToHeader(const DestinationName: string): TKeyValue;
+      deprecated 'Use ReplyTo instead';
 
-
-const
-  CHAR0 = #0;
-
-{$ELSE}
-
-
-uses
-  // Windows,   // Remove windows unit for compiling on ios
-  IdGlobal,
-  IdGlobalProtocols,
-  Character, Winapi.Windows;
-
-{$ENDIF}
+    class function Subscription(const SubscriptionName: string): TKeyValue;
+    class function Persistent(const Value: Boolean): TKeyValue;
+    class function Durable(const Value: Boolean): TKeyValue;
+    class function ReplyTo(const DestinationName: string): TKeyValue;
+  const
+    MESSAGE_ID: string = 'message-id';
+    TRANSACTION: string = 'transaction';
+    REPLY_TO: string = 'reply-to';
+    AUTO_DELETE: string = 'auto-delete';
+    // RabbitMQ specific headers
+    PREFETCH_COUNT: string = 'prefetch-count';
+    X_MESSAGE_TTL: string = 'x-message-ttl';
+    X_EXPIRES: string = 'x-expires';
+    /// /
+    function Add(Key, Value: string): IStompHeaders; overload;
+    function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
+    function Value(Key: string): string;
+    function Remove(Key: string): IStompHeaders;
+    function IndexOf(Key: string): Integer;
+    function Count: Cardinal;
+    function GetAt(const index: Integer): TKeyValue;
+    constructor Create;
+    destructor Destroy; override;
+    function Output: string;
+    property Items[index: Cardinal]: TKeyValue read GetItems
+      write SetItems; default;
+  end;
 
 class function StompUtils.StripLastChar(Buf: string; LastChar: char): string;
 var
@@ -590,7 +587,7 @@ begin
     raise EStomp.Create('End of Line not found.');
 end;
 
-class function StompUtils.CreateFrame(Buf: string): TStompFrame;
+class function StompUtils.CreateFrame(Buf: string): IStompFrame;
 var
   line: string;
   i: Integer;
@@ -638,12 +635,11 @@ begin
     on EStomp do
     begin
       // ignore
-      Result.Free;
       Result := nil;
     end;
     on e: Exception do
     begin
-      Result.Free;
+      Result := nil;
       raise EStomp.Create(e.Message);
     end;
   end;
@@ -988,10 +984,7 @@ begin
     FSynapseConnected := False;
     FSynapseTCP.Connect(Host, intToStr(Port));
     FSynapseConnected := True;
-
 {$ELSE}
-
-
     if FUseSSL then
     begin
       FIOHandlerSocketOpenSSL.OnGetPassword := OpenSSLGetPassword;
@@ -1014,8 +1007,8 @@ begin
     FTCP.ConnectTimeout := FConnectionTimeout;
     FTCP.Connect(Host, Port);
     FTCP.IOHandler.MaxLineLength := MaxInt;
-
 {$ENDIF}
+
     Frame := TStompFrame.Create;
     Frame.Command := 'CONNECT';
 
