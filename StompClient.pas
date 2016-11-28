@@ -120,6 +120,11 @@ type
     function Receive: IStompFrame; overload;
     function Receive(ATimeout: Integer): IStompFrame; overload;
     procedure Receipt(const ReceiptID: string);
+    function SetHost(Host: string): IStompClient;
+    function SetPort(Port: Integer): IStompClient;
+    function SetVirtualHost(VirtualHost: string): IStompClient;
+    function SetClientId(ClientId: string): IStompClient;
+    function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
     procedure Connect(Host: string = '127.0.0.1'; Port: Integer = 61613;
       VirtualHost: string = '';
       ClientID: string = '';
@@ -372,12 +377,16 @@ type
     function Receive: IStompFrame; overload;
     function Receive(ATimeout: Integer): IStompFrame; overload;
     procedure Receipt(const ReceiptID: string);
+    function SetHost(Host: string): IStompClient;
+    function SetPort(Port: Integer): IStompClient;
+    function SetVirtualHost(VirtualHost: string): IStompClient;
+    function SetClientId(ClientId: string): IStompClient;
+    function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
     procedure Connect(Host: string = '127.0.0.1';
       Port: Integer = DEFAULT_STOMP_PORT;
       VirtualHost: string = '';
       ClientID: string = '';
-      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
-      Ver_1_0);
+      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.Ver_1_0);
     procedure Disconnect;
     procedure Subscribe(QueueOrTopicName: string;
       Ack: TAckMode = TAckMode.amAuto; Headers: IStompHeaders = nil);
@@ -889,24 +898,59 @@ begin
       [TransactionIdentifier]);
 end;
 
+function TStompClient.SetHost(Host: string): IStompClient;
+begin
+  FHost := Host;
+  Result := Self;
+end;
+
+function TStompClient.SetPort(Port: Integer): IStompClient;
+begin
+  FPort := Port;
+  Result := Self;
+end;
+
+function TStompClient.SetVirtualHost(VirtualHost: string): IStompClient;
+begin
+  FVirtualHost := VirtualHost;
+  Result := Self;
+end;
+
+function TStompClient.SetClientId(ClientId: string): IStompClient;
+begin
+  FClientId := ClientId;
+  Result := Self;
+end;
+
+function TStompClient.SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
+begin
+  FAcceptVersion := AcceptVersion;
+  Result := Self;
+end;
+
 procedure TStompClient.Connect(Host: string; Port: Integer; VirtualHost: string;
   ClientID: string; AcceptVersion: TStompAcceptProtocol);
 var
   Frame: IStompFrame;
   lHeartBeat: string;
 begin
-  FHost := Host;
-  FPort := Port;
-  FVirtualHost := VirtualHost;
-  FClientID := ClientID;
-  FAcceptVersion := AcceptVersion;
+  if Host <> '127.0.0.1' then
+    FHost := Host;
+  if Port <> DEFAULT_STOMP_PORT then
+    FPort := Port;
+  if VirtualHost <> '' then
+    FVirtualHost := VirtualHost;
+  if ClientId <> ClientID then
+    FClientID := ClientID;
+  if AcceptVersion <> TStompAcceptProtocol.Ver_1_0 then
+    FAcceptVersion := AcceptVersion;
 
   try
     Init;
 
 {$IFDEF USESYNAPSE}
     FSynapseConnected := False;
-    FSynapseTCP.Connect(Host, intToStr(Port));
+    FSynapseTCP.Connect(FHost, intToStr(FPort));
     FSynapseConnected := True;
 {$ELSE}
     if FUseSSL then
@@ -929,14 +973,14 @@ begin
     end;
 
     FTCP.ConnectTimeout := FConnectionTimeout;
-    FTCP.Connect(Host, Port);
+    FTCP.Connect(FHost, FPort);
     FTCP.IOHandler.MaxLineLength := MaxInt;
 {$ENDIF}
 
     Frame := TStompFrame.Create;
     Frame.Command := 'CONNECT';
 
-    FClientAcceptProtocolVersion := AcceptVersion;
+    FClientAcceptProtocolVersion := FAcceptVersion;
     if TStompAcceptProtocol.Ver_1_1 in [FClientAcceptProtocolVersion]
     then
     begin
@@ -949,16 +993,15 @@ begin
       Frame.Headers.Add('accept-version', '1.0'); // stomp 1.0
     end;
 
-    if VirtualHost <> '' then
+    if FVirtualHost <> '' then
     begin
-      Frame.Headers.Add('host', VirtualHost);
+      Frame.Headers.Add('host', FVirtualHost);
     end;
 
     Frame.Headers.Add('login', FUserName).Add('passcode', FPassword);
-    FClientID := ClientID;
-    if ClientID <> '' then
+    if FClientID <> '' then
     begin
-      Frame.Headers.Add('client-id', ClientID);
+      Frame.Headers.Add('client-id', FClientID);
     end;
     SendFrame(Frame);
     Frame := nil;
@@ -1022,6 +1065,12 @@ begin
   FConnectionTimeout := 1000 * 10; // 10secs
   FIncomingHeartBeats := 10000; // 10secs
   FOutgoingHeartBeats := 0; // disabled
+
+  FHost := '127.0.0.1';
+  FPort := DEFAULT_STOMP_PORT;
+  FVirtualHost := '';
+  FClientID := '';
+  FAcceptVersion := TStompAcceptProtocol.Ver_1_0;
 end;
 
 procedure TStompClient.DeInit;
