@@ -10,17 +10,16 @@ program producer;
 
 uses
   System.SysUtils,
-  StompTypes in '..\..\StompTypes.pas',
   StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
-  lClient: TStompClient;
+  lClient: IStompClient;
   lMessage: string;
 begin
-  lClient := TStompClient.Create;
+  lClient := StompUtils.StompClient;
   lClient.SetHeartBeat(0, 2000);
-  lClient.Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+  lClient.Connect('127.0.0.1', 61613, '', '', TStompAcceptProtocol.Ver_1_1);
   WriteLn('Sending messages to topic "mytopic"');
   WriteLn('NOTE: Consumers will wait a second for each "." present in the message.');
   WriteLn('      empty message will terminate the program.');

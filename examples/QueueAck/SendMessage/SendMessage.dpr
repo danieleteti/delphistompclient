@@ -2,7 +2,8 @@ program SendMessage;
 
 uses
   Vcl.Forms,
-  SendMessageForm in 'SendMessageForm.pas' {SendMessageMainForm};
+  SendMessageForm in 'SendMessageForm.pas' {SendMessageMainForm},
+  StompClient in '..\..\..\StompClient.pas';
 
 {$R *.res}
 
