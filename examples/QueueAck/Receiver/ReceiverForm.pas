@@ -63,7 +63,7 @@ begin
         ('Cannot connect to Apollo server. Run the server and restart the application');
     end;
   end;
-  StompClient.OnBeforeSendFrame := BeforeSendFrame;
+  StompClient.SetOnBeforeSendFrame(BeforeSendFrame);
   StompFrame := StompUtils.NewFrame();
   ThReceiver := TThreadReceiver.Create(True);
   ThReceiver.StompClient := StompClient;

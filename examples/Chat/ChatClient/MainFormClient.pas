@@ -41,7 +41,7 @@ begin
   stomp := StompUtils.StompClient;
 //  stomp.SetUserName('admin');
 //  stomp.SetPassword('password');
-  stomp.Connect(Edit1.Text);
+  stomp.SetHost(Edit1.Text).Connect;
 
   //Setup for reading messages
   stomp.Subscribe(roomname, amClient);

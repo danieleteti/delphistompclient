@@ -57,7 +57,7 @@ end;
 procedure TSendMessageMainForm.FormCreate(Sender: TObject);
 begin
   StompClient := StompUtils.StompClient;
-  StompClient.OnBeforeSendFrame := BeforeSendFrame;
+  StompClient.SetOnBeforeSendFrame(BeforeSendFrame);
 end;
 
 procedure TSendMessageMainForm.AutomaticSendTimerTimer(Sender: TObject);

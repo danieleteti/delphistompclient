@@ -17,9 +17,10 @@ var
   lClient: IStompClient;
   lMessage: string;
 begin
-  lClient := StompUtils.StompClient;
-  lClient.SetHeartBeat(0, 2000);
-  lClient.Connect('127.0.0.1', 61613, '', '', TStompAcceptProtocol.Ver_1_1);
+  lClient := StompUtils.StompClient
+               .SetHeartBeat(0, 2000)
+               .SetAcceptVersion(TStompAcceptProtocol.Ver_1_1)
+               .Connect;
   WriteLn('Sending messages to topic "mytopic"');
   WriteLn('NOTE: Consumers will wait a second for each "." present in the message.');
   WriteLn('      empty message will terminate the program.');
