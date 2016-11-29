@@ -659,7 +659,6 @@
         </DelphiCompile>
         <DCCReference Include="MainU.pas"/>
         <DCCReference Include="..\StompClient.pas"/>
-        <DCCReference Include="..\StompTypes.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -130,7 +130,6 @@
         </DelphiCompile>
         <DCCReference Include="TestStompClientU.pas"/>
         <DCCReference Include="..\StompClient.pas"/>
-        <DCCReference Include="..\StompTypes.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

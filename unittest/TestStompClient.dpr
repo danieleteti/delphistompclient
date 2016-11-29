@@ -12,8 +12,7 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   DUnitX.TestFramework,
   TestStompClientU in 'TestStompClientU.pas',
-  StompClient in '..\StompClient.pas',
-  StompTypes in '..\StompTypes.pas';
+  StompClient in '..\StompClient.pas';
 
 var
   runner : ITestRunner;

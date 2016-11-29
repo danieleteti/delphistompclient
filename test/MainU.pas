@@ -3,10 +3,10 @@ unit MainU;
 interface
 
 uses
-  StompTypes;
+  StompClient;
 
 procedure Main(serveraddress: string = 'localhost';
-  STOMP_VERSION: TStompAcceptProtocol = STOMP_Version_1_0);
+  STOMP_VERSION: TStompAcceptProtocol = Ver_1_0);
 procedure MainWithTransaction(serveraddress: string = 'localhost');
 procedure Test_Unicode_Chars(serveraddress: string = 'localhost');
 
@@ -15,21 +15,19 @@ implementation
 uses
   SysUtils,
   dateutils,
-  StompClient,
   Diagnostics;
 
 procedure Test_Unicode_Chars(serveraddress: string);
 var
   stomp: IStompClient;
   s: IStompFrame;
-  utf8s: UTF8String;
   s1: string;
 const
   SERBO = 'Što je Unicode';
   SVEDESE = 'Vad är Unicode';
   ITALIANO = 'Cos''è Unicode';
 begin
-  stomp := StompUtils.NewStomp(serveraddress);
+  stomp := StompUtils.StompClient.SetHost(serveraddress);
   stomp.Subscribe('/topic/unicode');
 
   stomp.Send('/topic/unicode', ITALIANO);
@@ -65,8 +63,8 @@ const
   BODY3 = 'Hello World 3';
   BODY4 = 'Hello World 4';
 begin
-  stomp := StompUtils.NewStomp;
-  recv := StompUtils.NewStomp;
+  stomp := StompUtils.StompClient;
+  recv := StompUtils.StompClient;
 
   stomp.Subscribe(TOPIC);
   recv.Subscribe(TOPIC);
@@ -107,7 +105,7 @@ begin
 end;
 
 procedure Main(serveraddress: string = 'localhost';
-  STOMP_VERSION: TStompAcceptProtocol = STOMP_Version_1_0);
+  STOMP_VERSION: TStompAcceptProtocol = Ver_1_0);
 var
   stomp: IStompClient;
   frame: IStompFrame;
@@ -124,13 +122,15 @@ begin
   message_data := StringOfChar('X', MSG_SIZE);
   WriteLn('TEST MESSAGE IS (', length(message_data), ' bytes - WILL BE UTF8 Encoded):', #13#10, '"',
     message_data, '"'#13#10#13#10);
-  stomp := StompUtils.NewStomp(serveraddress, DEFAULT_STOMP_PORT, '', 'guest', 'guest',
-    STOMP_VERSION);
+  stomp := StompUtils.StompClient.SetHost(serveraddress).SetPort(DEFAULT_STOMP_PORT)
+    .SetUserName('guest')
+    .SetPassword('guest')
+    .SetAcceptVersion(STOMP_VERSION);
   WriteLn('SERVER: ', stomp.GetServer, ' PROTOCOL VERSION: ' + stomp.GetProtocolVersion);
 
-  if STOMP_VERSION = STOMP_Version_1_1 then
+  if STOMP_VERSION = Ver_1_1 then
     // Include the required ID header for STOMP 1.1
-    stomp.Subscribe('/topic/foo.bar', amAuto, StompUtils.NewHeaders.Add('id', '1234'))
+    stomp.Subscribe('/topic/foo.bar', amAuto, StompUtils.Headers.Add('id', '1234'))
   else
     // Do not include ID header because is not required for STOMP 1.0
     stomp.Subscribe('/topic/foo.bar', amAuto);
@@ -143,7 +143,7 @@ begin
     for i := 1 to MSG do
     begin
       stomp.Send('/topic/foo.bar', message_data,
-        StompUtils.NewHeaders.Add(TStompHeaders.NewPersistentHeader(true)));
+        StompUtils.Headers.Add(StompUtils.NewPersistentHeader(true)));
       // if i mod 100 = 0 then
       WriteLn('Queued ', i, ' messages in ', sw.ElapsedMilliseconds, ' ms');
     end;
