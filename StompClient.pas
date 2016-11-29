@@ -46,6 +46,7 @@ uses
 const
   LINE_END: char = #10;
   COMMAND_END: char = #0;
+  DEFAULT_STOMP_HOST = '127.0.0.1';
   DEFAULT_STOMP_PORT = 61613;
 
 type
@@ -204,7 +205,7 @@ type
 
   StompUtils = class
     class function StompClient: IStompClient;
-    class function StompClientAndConnect(Host: string = '127.0.0.1';
+    class function StompClientAndConnect(Host: string = DEFAULT_STOMP_HOST;
       Port: Integer = DEFAULT_STOMP_PORT;
       VirtualHost: string = '';
       ClientID: string = '';
@@ -386,11 +387,7 @@ type
     function SetVirtualHost(VirtualHost: string): IStompClient;
     function SetClientId(ClientId: string): IStompClient;
     function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
-    procedure Connect(Host: string = '127.0.0.1';
-      Port: Integer = DEFAULT_STOMP_PORT;
-      VirtualHost: string = '';
-      ClientID: string = '';
-      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.Ver_1_0);
+    function Connect: IStompClient;
     procedure Disconnect;
     procedure Subscribe(QueueOrTopicName: string;
       Ack: TAckMode = TAckMode.amAuto; Headers: IStompHeaders = nil);
@@ -420,15 +417,13 @@ type
     property ReceiptTimeout: Integer read FReceiptTimeout
       write SetReceiptTimeout;
     property Transactions: TStringList read FTransactions;
+    function SetConnectionTimeout(const Value: UInt32): IStompClient;
     property ConnectionTimeout: UInt32 read FConnectionTimeout
-      write SetConnectionTimeout;
+      write FConnectionTimeout;
     // * Manage Events
-    property OnBeforeSendFrame: TSenderFrameEvent read GetOnBeforeSendFrame
-      write SetOnBeforeSendFrame;
-    property OnAfterSendFrame: TSenderFrameEvent read GetOnAfterSendFrame
-      write SetOnAfterSendFrame;
-    property OnHeartBeatError: TNotifyEvent read GetOnHeartBeatError
-      write SetOnHeartBeatError;
+    function SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
 
     // Add by GC 26/01/2001
     property OnConnect: TStompConnectNotifyEvent read GetOnConnect write SetOnConnect;
