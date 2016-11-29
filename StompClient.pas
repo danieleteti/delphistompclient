@@ -74,14 +74,18 @@ type
 
   StompHeaders = class
     const
-      MESSAGE_ID: string = 'message-id';
-      TRANSACTION: string = 'transaction';
-      REPLY_TO: string = 'reply-to';
-      AUTO_DELETE: string = 'auto-delete';
+      MESSAGE_ID:     string = 'message-id';
+      TRANSACTION:    string = 'transaction';
+      REPLY_TO:       string = 'reply-to';
+      AUTO_DELETE:    string = 'auto-delete';
+      CONTENT_LENGTH: string = 'content-length';
+      CONTENT_TYPE:   string = 'content-type';
+      RECEIPT:        string = 'receipt';
       // RabbitMQ specific headers
       PREFETCH_COUNT: string = 'prefetch-count';
-      X_MESSAGE_TTL: string = 'x-message-ttl';
-      X_EXPIRES: string = 'x-expires';
+      X_MESSAGE_TTL:  string = 'x-message-ttl';
+      X_EXPIRES:      string = 'x-expires';
+      TIMESTAMP:      string = 'timestamp';
   end;
 
   IStompHeaders = interface
