@@ -1197,8 +1197,6 @@ begin
 end;
 
 {$IFDEF USESYNAPSE}
-
-
 procedure TStompClient.SynapseSocketCallBack(Sender: TObject;
   Reason: THookSocketReason; const Value: string);
 begin
@@ -1209,9 +1207,7 @@ begin
     FSynapseConnected := False;
   end;
 end;
-
 {$ENDIF}
-
 
 procedure TStompClient.MergeHeaders(var AFrame: IStompFrame;
   var AHeaders: IStompHeaders);
@@ -1495,19 +1491,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
       lSBuilder.Free;
     end;
   end;
-
 {$ENDIF}
-
 
 begin
 {$IFDEF USESYNAPSE}
   Result := InternalReceiveSynapse(ATimeout);
-
 {$ELSE}
   Result := InternalReceiveINDY(ATimeout);
-
 {$ENDIF}
-
 end;
 
 function TStompClient.Receive: IStompFrame;
