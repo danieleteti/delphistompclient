@@ -130,10 +130,7 @@ type
     function SetVirtualHost(VirtualHost: string): IStompClient;
     function SetClientId(ClientId: string): IStompClient;
     function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
-    procedure Connect(Host: string = '127.0.0.1'; Port: Integer = 61613;
-      VirtualHost: string = '';
-      ClientID: string = '';
-      AcceptVersion: TStompAcceptProtocol = Ver_1_0);
+    function Connect: IStompClient;
     function Clone: IStompClient;
     procedure Disconnect;
     procedure Subscribe(QueueOrTopicName: string; Ack: TAckMode = amAuto;
@@ -165,18 +162,10 @@ type
     function GetServer: string;
     function GetSession: string;
 
-    function GetOnBeforeSendFrame: TSenderFrameEvent;
-    procedure SetOnBeforeSendFrame(const Value: TSenderFrameEvent);
-    property OnBeforeSendFrame: TSenderFrameEvent read GetOnBeforeSendFrame
-      write SetOnBeforeSendFrame;
-    function GetOnAfterSendFrame: TSenderFrameEvent;
-    procedure SetOnAfterSendFrame(const Value: TSenderFrameEvent);
-    property OnAfterSendFrame: TSenderFrameEvent read GetOnAfterSendFrame
-      write SetOnAfterSendFrame;
-    function GetOnHeartBeatError: TNotifyEvent;
-    procedure SetOnHeartBeatError(const Value: TNotifyEvent);
-    property OnHeartBeatError: TNotifyEvent read GetOnHeartBeatError
-      write SetOnHeartBeatError;
+    function SetConnectionTimeout(const Value: UInt32): IStompClient;
+    function SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
     function GetOnConnect: TStompConnectNotifyEvent;
     procedure SetOnConnect(const Value: TStompConnectNotifyEvent);
     property OnConnect: TStompConnectNotifyEvent read GetOnConnect write SetOnConnect;
@@ -343,15 +332,8 @@ type
 
     procedure ParseHeartBeat(Headers: IStompHeaders);
     procedure SetReceiptTimeout(const Value: Integer);
-    procedure SetConnectionTimeout(const Value: UInt32);
     function GetOnConnect: TStompConnectNotifyEvent;
     procedure SetOnConnect(const Value: TStompConnectNotifyEvent);
-    function GetOnAfterSendFrame: TSenderFrameEvent;
-    function GetOnBeforeSendFrame: TSenderFrameEvent;
-    function GetOnHeartBeatError: TNotifyEvent;
-    procedure SetOnAfterSendFrame(const Value: TSenderFrameEvent);
-    procedure SetOnBeforeSendFrame(const Value: TSenderFrameEvent);
-    procedure SetOnHeartBeatError(const Value: TNotifyEvent);
 
   protected
 {$IFDEF USESYNAPSE}
@@ -873,9 +855,16 @@ end;
 function TStompClient.Clone: IStompClient;
 begin
   Result := TStompClient.Create;
-  Result.SetUserName(FUserName).SetPassword(FPassword);
-  TStompClient(Result).ConnectionTimeout := FConnectionTimeout;
-  TStompClient(Result).Connect(FHost, FPort, FVirtualHost, FClientID, FAcceptVersion);
+  Result
+    .SetUserName(FUserName)
+    .SetPassword(FPassword)
+    .SetConnectionTimeout(FConnectionTimeout)
+    .SetHost(FHost)
+    .SetPort(FPort)
+    .SetVirtualHost(FVirtualHost)
+    .SetClientID(FClientId)
+    .SetAcceptVersion(FAcceptVersion)
+    .Connect;
 end;
 
 procedure TStompClient.CommitTransaction(const TransactionIdentifier: string);
@@ -927,23 +916,11 @@ begin
   Result := Self;
 end;
 
-procedure TStompClient.Connect(Host: string; Port: Integer; VirtualHost: string;
-  ClientID: string; AcceptVersion: TStompAcceptProtocol);
+function TStompClient.Connect: IStompClient;
 var
   Frame: IStompFrame;
   lHeartBeat: string;
 begin
-  if Host <> '127.0.0.1' then
-    FHost := Host;
-  if Port <> DEFAULT_STOMP_PORT then
-    FPort := Port;
-  if VirtualHost <> '' then
-    FVirtualHost := VirtualHost;
-  if ClientId <> ClientID then
-    FClientID := ClientID;
-  if AcceptVersion <> TStompAcceptProtocol.Ver_1_0 then
-    FAcceptVersion := AcceptVersion;
-
   try
     Init;
 
@@ -1035,6 +1012,8 @@ begin
       raise EStomp.Create(E.message);
     end;
   end;
+
+  Result := Self;
 end;
 
 function TStompClient.Connected: boolean;
@@ -1143,24 +1122,9 @@ begin
     AErrorFrame.Body;
 end;
 
-function TStompClient.GetOnAfterSendFrame: TSenderFrameEvent;
-begin
-  Result := FOnAfterSendFrame;
-end;
-
-function TStompClient.GetOnBeforeSendFrame: TSenderFrameEvent;
-begin
-  Result := FOnBeforeSendFrame;
-end;
-
 function TStompClient.GetOnConnect: TStompConnectNotifyEvent;
 begin
   Result := FOnConnect;
-end;
-
-function TStompClient.GetOnHeartBeatError: TNotifyEvent;
-begin
-  Result := FOnHeartBeatError;
 end;
 
 function TStompClient.GetProtocolVersion: string;
@@ -1596,9 +1560,10 @@ begin
   Result := (FServerProtocolVersion = '1.1') and (FServerOutgoingHeartBeats > 0)
 end;
 
-procedure TStompClient.SetConnectionTimeout(const Value: UInt32);
+function TStompClient.SetConnectionTimeout(const Value: UInt32): IStompClient;
 begin
   FConnectionTimeout := Value;
+  Result := Self;
 end;
 
 function TStompClient.SetHeartBeat(const OutgoingHeartBeats, IncomingHeartBeats: Int64)
@@ -1609,14 +1574,16 @@ begin
   Result := Self;
 end;
 
-procedure TStompClient.SetOnAfterSendFrame(const Value: TSenderFrameEvent);
+function TStompClient.SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
 begin
   FOnAfterSendFrame := Value;
+  Result := Self;
 end;
 
-procedure TStompClient.SetOnBeforeSendFrame(const Value: TSenderFrameEvent);
+function TStompClient.SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
 begin
   FOnBeforeSendFrame := Value;
+  Result := Self;
 end;
 
 procedure TStompClient.SetOnConnect(const Value: TStompConnectNotifyEvent);
@@ -1624,9 +1591,10 @@ begin
   FOnConnect := Value;
 end;
 
-procedure TStompClient.SetOnHeartBeatError(const Value: TNotifyEvent);
+function TStompClient.SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
 begin
   FOnHeartBeatError := Value;
+  Result := Self;
 end;
 
 function TStompClient.SetPassword(const Value: string): IStompClient;
@@ -1751,8 +1719,13 @@ class function StompUtils.StompClientAndConnect(Host: string; Port: Integer;
   VirtualHost: string; ClientID: string;
   AcceptVersion: TStompAcceptProtocol): IStompClient;
 begin
-  Result := TStompClient.Create;
-  Result.Connect(Host, Port, VirtualHost, ClientID, AcceptVersion);
+  Result := Self.StompClient
+                .SetHost(Host)
+                .SetPort(Port)
+                .SetVirtualHost(VirtualHost)
+                .SetClientID(ClientID)
+                .SetAcceptVersion(AcceptVersion)
+                .Connect;
 end;
 
 class function StompUtils.NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
