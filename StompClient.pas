@@ -104,12 +104,16 @@ type
   IStompFrame = interface
     ['{68274885-D3C3-4890-A058-03B769B2191E}']
     function Output: string;
+    function OutputBytes: TBytes;
     procedure SetHeaders(const Value: IStompHeaders);
     function GetCommand: string;
     procedure SetCommand(const Value: string);
     function GetBody: string;
     procedure SetBody(const Value: string);
     property Body: string read GetBody write SetBody;
+    function GetBytesBody: TBytes;
+    procedure SetBytesBody(const Value: TBytes);
+    property BytesBody: TBytes read GetBytesBody write SetBytesBody;
     function GetHeaders: IStompHeaders;
     function MessageID: string;
     function ContentLength: Integer;
@@ -139,6 +143,10 @@ type
     procedure Send(QueueOrTopicName: string; TextMessage: string;
       Headers: IStompHeaders = nil); overload;
     procedure Send(QueueOrTopicName: string; TextMessage: string;
+      TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
       TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
 
     procedure Ack(const MessageID: string; const subscriptionId: string = '';
@@ -232,7 +240,7 @@ type
   TStompFrame = class(TInterfacedObject, IStompFrame)
   private
     FCommand: string;
-    FBody: string;
+    FBody: TBytes;
     FContentLength: Integer;
     FHeaders: IStompHeaders;
     procedure SetHeaders(const Value: IStompHeaders);
@@ -240,6 +248,8 @@ type
     procedure SetCommand(const Value: string);
     function GetBody: string;
     procedure SetBody(const Value: string);
+    function GetBytesBody: TBytes;
+    procedure SetBytesBody(const Value: TBytes);
     function GetHeaders: IStompHeaders;
 
   public
@@ -247,9 +257,11 @@ type
     destructor Destroy; override;
     property Command: string read GetCommand write SetCommand;
     property Body: string read GetBody write SetBody;
+    property BytesBody: TBytes read GetBytesBody write SetBytesBody;
     // return '', when Key doesn't exist or Value of Key is ''
     // otherwise, return Value;
     function Output: string;
+    function OutputBytes: TBytes;
     function MessageID: string;
     function ContentLength: Integer;
     function ReplyTo: string;
@@ -345,7 +357,7 @@ type
     procedure DeInit;
     procedure MergeHeaders(var AFrame: IStompFrame;
       var AHeaders: IStompHeaders);
-    procedure SendFrame(AFrame: IStompFrame);
+    procedure SendFrame(AFrame: IStompFrame; AsBytes: boolean = false);
     procedure SendHeartBeat;
     function FormatErrorFrame(const AErrorFrame: IStompFrame): string;
     function ServerSupportsHeartBeat: boolean;
@@ -377,6 +389,10 @@ type
     procedure Send(QueueOrTopicName: string; TextMessage: string;
       Headers: IStompHeaders = nil); overload;
     procedure Send(QueueOrTopicName: string; TextMessage: string;
+      TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
       TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
     procedure Ack(const MessageID: string; const subscriptionId: string = '';
       const TransactionIdentifier: string = ''); // ACK  STOMP 1.1 : has two REQUIRED headers: message-id, which MUST contain a value matching the message-id for the MESSAGE being acknowledged and subscription, which MUST be set to match the value of the subscription's id header
@@ -481,7 +497,7 @@ constructor TStompFrame.Create;
 begin
   FHeaders := TStompHeaders.Create;
   self.FCommand := '';
-  self.FBody := '';
+  SetLength(self.FBody, 0);
   self.FContentLength := 0;
 end;
 
@@ -491,6 +507,11 @@ begin
 end;
 
 function TStompFrame.GetBody: string;
+begin
+  Result := TEncoding.UTF8.GetString(FBody);
+end;
+
+function TStompFrame.GetBytesBody: TBytes;
 begin
   Result := FBody;
 end;
@@ -512,8 +533,14 @@ end;
 
 function TStompFrame.Output: string;
 begin
-  Result := FCommand + LINE_END + FHeaders.Output + LINE_END + FBody +
+  Result := FCommand + LINE_END + FHeaders.Output + LINE_END + GetBody +
     COMMAND_END;
+end;
+
+function TStompFrame.OutputBytes: TBytes;
+begin
+  Result := TEncoding.UTF8.GetBytes(FCommand + LINE_END + FHeaders.Output + LINE_END)
+    + GetBytesBody + TEncoding.UTF8.GetBytes(COMMAND_END);
 end;
 
 function TStompFrame.ReplyTo: string;
@@ -528,8 +555,13 @@ end;
 
 procedure TStompFrame.SetBody(const Value: string);
 begin
+  SetBytesBody(TEncoding.UTF8.GetBytes(Value));
+end;
+
+procedure TStompFrame.SetBytesBody(const Value: TBytes);
+begin
   FBody := Value;
-  FContentLength := Length(TEncoding.UTF8.GetBytes(FBody));
+  FContentLength := Length(FBody);
 end;
 
 procedure TStompFrame.SetCommand(const Value: string);
@@ -1496,8 +1528,35 @@ begin
   SendFrame(Frame);
 end;
 
+procedure TStompClient.Send(QueueOrTopicName: string; ByteMessage: TBytes;
+  Headers: IStompHeaders);
+var
+  Frame: IStompFrame;
+begin
+  Frame := TStompFrame.Create;
+  Frame.Command := 'SEND';
+  Frame.Headers.Add('destination', QueueOrTopicName);
+  Frame.BytesBody := ByteMessage;
+  MergeHeaders(Frame, Headers);
+  SendFrame(Frame, true);
+end;
 
-procedure TStompClient.SendFrame(AFrame: IStompFrame);
+procedure TStompClient.Send(QueueOrTopicName: string; ByteMessage: TBytes;
+  TransactionIdentifier: string; Headers: IStompHeaders);
+var
+  Frame: IStompFrame;
+begin
+  Frame := TStompFrame.Create;
+  Frame.Command := 'SEND';
+  Frame.Headers.Add('destination', QueueOrTopicName);
+  Frame.Headers.Add('transaction', TransactionIdentifier);
+  Frame.BytesBody := ByteMessage;
+  MergeHeaders(Frame, Headers);
+  SendFrame(Frame, true);
+end;
+
+
+procedure TStompClient.SendFrame(AFrame: IStompFrame; AsBytes: boolean = false);
 begin
   TMonitor.Enter(FLock);
   Try
@@ -1506,7 +1565,10 @@ begin
       {$IFDEF USESYNAPSE}
           if Assigned(FOnBeforeSendFrame) then
             FOnBeforeSendFrame(AFrame);
-          FSynapseTCP.SendString(AFrame.output);
+          if AsBytes then
+            FSynapseTCP.SendBytes(AFrame.OutputBytes)
+          else
+            FSynapseTCP.SendString(AFrame.Output);
           if Assigned(FOnAfterSendFrame) then
             FOnAfterSendFrame(AFrame);
       {$ELSE}
@@ -1515,10 +1577,16 @@ begin
             FOnBeforeSendFrame(AFrame);
 
       {$IF CompilerVersion < 25}
-          FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
+          if AsBytes then
+            FTCP.IOHandler.Write(AFrame.OutputBytes)
+          else
+            FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
       {$IFEND}
       {$IF CompilerVersion >= 25}
-          FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
+          if AsBytes then
+            FTCP.IOHandler.Write(TIdBytes(AFrame.OutputBytes))
+          else
+            FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
       {$IFEND}
 
           if Assigned(FOnAfterSendFrame) then
