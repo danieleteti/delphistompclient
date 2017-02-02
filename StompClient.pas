@@ -51,6 +51,12 @@ type
 
   THeartBeatThread = class;
 
+{$IF CompilerVersion < 24}
+  IIdString = AnsiString;
+{$ELSE}
+  IIdString = string;
+{$IFEND}
+
   TStompClient = class(TInterfacedObject, IStompClient)
   private
 
@@ -122,7 +128,7 @@ type
     function ServerSupportsHeartBeat: boolean;
     procedure OnHeartBeatErrorHandler(Sender: TObject);
     procedure DoHeartBeatErrorHandler;
-    procedure OpenSSLGetPassword(var Password: String);
+    procedure OpenSSLGetPassword(var Password: IIdString);
   public
     Function SetUseSSL(const boUseSSL: boolean;
       const KeyFile : string =''; const CertFile : string = '';
@@ -211,22 +217,19 @@ type
 
 implementation
 
-{$IFDEF FPC}
+uses
+{$IFDEF USESYNAPSE}
+  synautil;
+{$ELSE}
+  IdGlobal,
+  IdGlobalProtocols;
+{$ENDIF}
 
-
+{$IFDEF USESYNAPSE}
 const
   CHAR0 = #0;
-
-{$ELSE}
-
-
-uses
-  // Windows,   // Remove windows unit for compiling on ios
-  IdGlobal,
-  IdGlobalProtocols,
-  Character, Winapi.Windows;
-
 {$ENDIF}
+
 { TStompClient }
 
 procedure TStompClient.AbortTransaction(const TransactionIdentifier: string);
@@ -356,7 +359,11 @@ begin
       FIOHandlerSocketOpenSSL.OnGetPassword := OpenSSLGetPassword;
       FIOHandlerSocketOpenSSL.Port := 0  ;
       FIOHandlerSocketOpenSSL.DefaultPort := 0       ;
+{$IF CompilerVersion < 24}
+      FIOHandlerSocketOpenSSL.SSLOptions.Method := sslvTLSv1; //sslvTLSv1_2; //sslvSSLv3; //sslvSSLv23;
+{$ELSE}
       FIOHandlerSocketOpenSSL.SSLOptions.Method := sslvTLSv1_2; //sslvSSLv3; //sslvSSLv23;
+{$IFEND}
       FIOHandlerSocketOpenSSL.SSLOptions.KeyFile  := FsslKeyFile;
       FIOHandlerSocketOpenSSL.SSLOptions.CertFile := FsslCertFile;
       FIOHandlerSocketOpenSSL.SSLOptions.Mode := sslmUnassigned; //sslmClient;
@@ -638,9 +645,9 @@ begin
   DoHeartBeatErrorHandler;
 end;
 
-procedure TStompClient.OpenSSLGetPassword(var Password: String);
+procedure TStompClient.OpenSSLGetPassword(var Password: IIdString);
 begin
-  Password := FsslKeyPass;
+  Password := IIdString(FsslKeyPass);
 end;
 
 procedure TStompClient.ParseHeartBeat(Headers: IStompHeaders);
@@ -752,14 +759,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
     FreeEncoding: boolean;
 {$ELSE}
     Encoding: IIdTextEncoding;
-{$ENDIF}
+{$IFEND}
   begin
     Result := nil;
     lSBuilder := TStringBuilder.Create(1024 * 4);
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
-{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$IFEND};
 
       try
         lTimestampFirstReadLn := Now;
@@ -816,19 +823,21 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             Encoding := CharsetToEncoding(Charset);
 {$IF CompilerVersion < 24}
             FreeEncoding := True;
-{$ENDIF}
+{$IFEND}
           end
           else
           begin
-            Encoding := IndyTextEncoding_8Bit();
 {$IF CompilerVersion < 24}
+            Encoding := Indy8BitEncoding();
             FreeEncoding := False;
-{$ENDIF}
+{$ELSE}
+            Encoding := IndyTextEncoding_8Bit();
+{$IFEND}
           end;
 
 {$IF CompilerVersion < 24}
           try
-{$ENDIF}
+{$IFEND}
             if Headers.IndexOfName('content-length') <> -1 then
             begin
               // length specified, read exactly that many bytes
@@ -855,7 +864,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             if FreeEncoding then
               Encoding.Free;
           end;
-{$ENDIF}
+{$IFEND}
         finally
           Headers.Free;
         end;
