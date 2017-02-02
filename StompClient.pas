@@ -29,18 +29,16 @@ uses
   StompTypes,
   SysUtils,
   DateUtils,
-
+  SyncObjs,
 {$IFNDEF USESYNAPSE}
   IdTCPClient,
   IdException,
   IdExceptionCore,
   IdHeaderList,
   IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL, // SSL
-  System.SyncObjs,
 {$ELSE}
   synsock,
   blcksock,
-
 {$ENDIF}
   Classes;
 
@@ -50,6 +48,16 @@ type
   TSenderFrameEvent = procedure(AFrame: IStompFrame) of object;
 
   THeartBeatThread = class;
+
+{$IFDEF USESYNAPSE}
+  IIdString = AnsiString;
+{$ELSE}
+  {$IF CompilerVersion < 24}
+    IIdString = AnsiString;
+  {$ELSE}
+    IIdString = string;
+  {$IFEND}
+{$ENDIF}
 
   TStompClient = class(TInterfacedObject, IStompClient)
   private
@@ -91,7 +99,7 @@ type
     FConnectionTimeout: UInt32;
     FOutgoingHeartBeats: Int64;
     FIncomingHeartBeats: Int64;
-    FLock: TObject;
+    FLock: TCriticalSection;
     FHeartBeatThread: THeartBeatThread;
     FServerIncomingHeartBeats: Int64;
     FServerOutgoingHeartBeats: Int64;
@@ -122,7 +130,7 @@ type
     function ServerSupportsHeartBeat: boolean;
     procedure OnHeartBeatErrorHandler(Sender: TObject);
     procedure DoHeartBeatErrorHandler;
-    procedure OpenSSLGetPassword(var Password: String);
+    procedure OpenSSLGetPassword(var Password: IIdString);
   public
     Function SetUseSSL(const boUseSSL: boolean;
       const KeyFile : string =''; const CertFile : string = '';
@@ -197,36 +205,33 @@ type
   THeartBeatThread = class(TThread)
   private
     FStompClient: TStompClient;
-    FLock: TObject;
+    FLock: TCriticalSection;
     FOutgoingHeatBeatTimeout: Int64;
     FOnHeartBeatError: TNotifyEvent;
   protected
     procedure Execute; override;
     procedure DoHeartBeatError;
   public
-    constructor Create(StompClient: TStompClient; Lock: TObject;
+    constructor Create(StompClient: TStompClient; Lock: TCriticalSection;
       OutgoingHeatBeatTimeout: Int64); virtual;
     property OnHeartBeatError: TNotifyEvent read FOnHeartBeatError write FOnHeartBeatError;
   end;
 
 implementation
 
-{$IFDEF FPC}
+uses
+{$IFDEF USESYNAPSE}
+  synautil;
+{$ELSE}
+  IdGlobal,
+  IdGlobalProtocols;
+{$ENDIF}
 
-
+{$IFDEF USESYNAPSE}
 const
   CHAR0 = #0;
-
-{$ELSE}
-
-
-uses
-  // Windows,   // Remove windows unit for compiling on ios
-  IdGlobal,
-  IdGlobalProtocols,
-  Character, Winapi.Windows;
-
 {$ENDIF}
+
 { TStompClient }
 
 procedure TStompClient.AbortTransaction(const TransactionIdentifier: string);
@@ -356,7 +361,11 @@ begin
       FIOHandlerSocketOpenSSL.OnGetPassword := OpenSSLGetPassword;
       FIOHandlerSocketOpenSSL.Port := 0  ;
       FIOHandlerSocketOpenSSL.DefaultPort := 0       ;
+{$IF CompilerVersion < 24}
+      FIOHandlerSocketOpenSSL.SSLOptions.Method := sslvTLSv1; //sslvTLSv1_2; //sslvSSLv3; //sslvSSLv23;
+{$ELSE}
       FIOHandlerSocketOpenSSL.SSLOptions.Method := sslvTLSv1_2; //sslvSSLv3; //sslvSSLv23;
+{$IFEND}
       FIOHandlerSocketOpenSSL.SSLOptions.KeyFile  := FsslKeyFile;
       FIOHandlerSocketOpenSSL.SSLOptions.CertFile := FsslCertFile;
       FIOHandlerSocketOpenSSL.SSLOptions.Mode := sslmUnassigned; //sslmClient;
@@ -454,7 +463,7 @@ end;
 constructor TStompClient.Create;
 begin
   inherited;
-  FLock := TObject.Create;
+  FLock := TCriticalSection.Create;
   FInTransaction := False;
   FSession := '';
   FUserName := 'guest';
@@ -638,9 +647,9 @@ begin
   DoHeartBeatErrorHandler;
 end;
 
-procedure TStompClient.OpenSSLGetPassword(var Password: String);
+procedure TStompClient.OpenSSLGetPassword(var Password: IIdString);
 begin
-  Password := FsslKeyPass;
+  Password := IIdString(FsslKeyPass);
 end;
 
 procedure TStompClient.ParseHeartBeat(Headers: IStompHeaders);
@@ -752,14 +761,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
     FreeEncoding: boolean;
 {$ELSE}
     Encoding: IIdTextEncoding;
-{$ENDIF}
+{$IFEND}
   begin
     Result := nil;
     lSBuilder := TStringBuilder.Create(1024 * 4);
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
-{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+{$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$IFEND};
 
       try
         lTimestampFirstReadLn := Now;
@@ -816,19 +825,21 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             Encoding := CharsetToEncoding(Charset);
 {$IF CompilerVersion < 24}
             FreeEncoding := True;
-{$ENDIF}
+{$IFEND}
           end
           else
           begin
-            Encoding := IndyTextEncoding_8Bit();
 {$IF CompilerVersion < 24}
+            Encoding := Indy8BitEncoding();
             FreeEncoding := False;
-{$ENDIF}
+{$ELSE}
+            Encoding := IndyTextEncoding_8Bit();
+{$IFEND}
           end;
 
 {$IF CompilerVersion < 24}
           try
-{$ENDIF}
+{$IFEND}
             if Headers.IndexOfName('content-length') <> -1 then
             begin
               // length specified, read exactly that many bytes
@@ -855,7 +866,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             if FreeEncoding then
               Encoding.Free;
           end;
-{$ENDIF}
+{$IFEND}
         finally
           Headers.Free;
         end;
@@ -925,7 +936,7 @@ end;
 
 procedure TStompClient.SendFrame(AFrame: IStompFrame);
 begin
-  TMonitor.Enter(FLock);
+  FLock.Enter;
   Try
     if Connected then // Test if error on Socket
     begin
@@ -952,13 +963,13 @@ begin
       {$ENDIF}
     end;
   Finally
-    TMonitor.Exit(FLock);
+    FLock.Leave;
   End;
 end;
 
 procedure TStompClient.SendHeartBeat;
 begin
-  TMonitor.Enter(FLock);
+  FLock.Enter;
   Try
     if Connected then
     begin
@@ -977,7 +988,7 @@ begin
     {$ENDIF}
     end;
   Finally
-    TMonitor.Exit(FLock);
+    FLock.Leave;
   End;
 end;
 
@@ -1073,7 +1084,7 @@ end;
 
 { THeartBeatThread }
 
-constructor THeartBeatThread.Create(StompClient: TStompClient; Lock: TObject;
+constructor THeartBeatThread.Create(StompClient: TStompClient; Lock: TCriticalSection;
   OutgoingHeatBeatTimeout: Int64);
 begin
   inherited Create(True);

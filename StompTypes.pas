@@ -247,6 +247,11 @@ type
   private
     FStompClient: IStompClient;
     FStompClientListener: IStompClientListener;
+    FReceiveFrame: IStompFrame;
+    FTerminateListener: Boolean;
+  private
+    procedure DoListenerMessage;
+    procedure DoListenerStopped;
   protected
     procedure Execute; override;
   public
@@ -660,28 +665,27 @@ begin
   FStompClientListener := StompClientListener;
 end;
 
-procedure TReceiverThread.Execute;
-var
-  LFrame: IStompFrame;
-  LTerminateListener: Boolean;
+procedure TReceiverThread.DoListenerMessage;
 begin
-  LTerminateListener := False;
-  while (not Terminated) and (not LTerminateListener) do
+  FStompClientListener.OnMessage(FReceiveFrame, FTerminateListener);
+end;
+
+procedure TReceiverThread.DoListenerStopped;
+begin
+  FStompClientListener.OnListenerStopped(FStompClient);
+end;
+
+procedure TReceiverThread.Execute;
+begin
+  FTerminateListener := False;
+  while (not Terminated) and (not FTerminateListener) do
   begin
-    if FStompClient.Receive(LFrame, 1000) then
+    if FStompClient.Receive(FReceiveFrame, 1000) then
     begin
-      TThread.Synchronize(nil,
-        procedure
-        begin
-          FStompClientListener.OnMessage(LFrame, LTerminateListener);
-        end);
+      TThread.Synchronize(nil, DoListenerMessage);
     end;
   end;
-  TThread.Synchronize(nil,
-    procedure
-    begin
-      FStompClientListener.OnListenerStopped(FStompClient);
-    end);
+  TThread.Synchronize(nil, DoListenerStopped);
 end;
 
 end.
