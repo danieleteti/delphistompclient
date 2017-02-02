@@ -29,18 +29,16 @@ uses
   StompTypes,
   SysUtils,
   DateUtils,
-
+  SyncObjs,
 {$IFNDEF USESYNAPSE}
   IdTCPClient,
   IdException,
   IdExceptionCore,
   IdHeaderList,
   IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL, // SSL
-  System.SyncObjs,
 {$ELSE}
   synsock,
   blcksock,
-
 {$ENDIF}
   Classes;
 
@@ -51,11 +49,15 @@ type
 
   THeartBeatThread = class;
 
-{$IF CompilerVersion < 24}
+{$IFDEF USESYNAPSE}
   IIdString = AnsiString;
 {$ELSE}
-  IIdString = string;
-{$IFEND}
+  {$IF CompilerVersion < 24}
+    IIdString = AnsiString;
+  {$ELSE}
+    IIdString = string;
+  {$IFEND}
+{$ENDIF}
 
   TStompClient = class(TInterfacedObject, IStompClient)
   private
@@ -97,7 +99,7 @@ type
     FConnectionTimeout: UInt32;
     FOutgoingHeartBeats: Int64;
     FIncomingHeartBeats: Int64;
-    FLock: TObject;
+    FLock: TCriticalSection;
     FHeartBeatThread: THeartBeatThread;
     FServerIncomingHeartBeats: Int64;
     FServerOutgoingHeartBeats: Int64;
@@ -203,14 +205,14 @@ type
   THeartBeatThread = class(TThread)
   private
     FStompClient: TStompClient;
-    FLock: TObject;
+    FLock: TCriticalSection;
     FOutgoingHeatBeatTimeout: Int64;
     FOnHeartBeatError: TNotifyEvent;
   protected
     procedure Execute; override;
     procedure DoHeartBeatError;
   public
-    constructor Create(StompClient: TStompClient; Lock: TObject;
+    constructor Create(StompClient: TStompClient; Lock: TCriticalSection;
       OutgoingHeatBeatTimeout: Int64); virtual;
     property OnHeartBeatError: TNotifyEvent read FOnHeartBeatError write FOnHeartBeatError;
   end;
@@ -461,7 +463,7 @@ end;
 constructor TStompClient.Create;
 begin
   inherited;
-  FLock := TObject.Create;
+  FLock := TCriticalSection.Create;
   FInTransaction := False;
   FSession := '';
   FUserName := 'guest';
@@ -934,7 +936,7 @@ end;
 
 procedure TStompClient.SendFrame(AFrame: IStompFrame);
 begin
-  TMonitor.Enter(FLock);
+  FLock.Enter;
   Try
     if Connected then // Test if error on Socket
     begin
@@ -961,13 +963,13 @@ begin
       {$ENDIF}
     end;
   Finally
-    TMonitor.Exit(FLock);
+    FLock.Leave;
   End;
 end;
 
 procedure TStompClient.SendHeartBeat;
 begin
-  TMonitor.Enter(FLock);
+  FLock.Enter;
   Try
     if Connected then
     begin
@@ -986,7 +988,7 @@ begin
     {$ENDIF}
     end;
   Finally
-    TMonitor.Exit(FLock);
+    FLock.Leave;
   End;
 end;
 
@@ -1082,7 +1084,7 @@ end;
 
 { THeartBeatThread }
 
-constructor THeartBeatThread.Create(StompClient: TStompClient; Lock: TObject;
+constructor THeartBeatThread.Create(StompClient: TStompClient; Lock: TCriticalSection;
   OutgoingHeatBeatTimeout: Int64);
 begin
   inherited Create(True);
