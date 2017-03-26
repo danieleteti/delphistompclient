@@ -24,3 +24,5 @@ Oliver Marr (encoding fixes)
 Marco Mottadelli (iOS fixes)
 
 Chenavier Gérald (STOMP 1.1 improvement)
+
+Marcelo Varela (Raw UTF8 messages support)
