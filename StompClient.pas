@@ -1,11 +1,12 @@
 // Stomp Client for Embarcadero Delphi & FreePasca
 // Tested With ApacheMQ 5.2/5.3, Apache Apollo 1.2, RabbitMQ
-// Copyright (c) 2009-2016 Daniele Teti
+// Copyright (c) 2009-2017 Daniele Teti
 //
 // Contributors:
 // Daniel Gaspary: dgaspary@gmail.com
 // Oliver Marr: oliver.sn@wmarr.de
 // Marco Mottadelli: mottadelli75@gmail.com
+// Marcelo Varela: https://www.facebook.com/marcelo.varela.9?fref=nf
 // WebSite: www.danieleteti.it
 // email:d.teti@bittime.it
 // *******************************************************
@@ -820,7 +821,8 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
           end
           else
           begin
-            Encoding := IndyTextEncoding_8Bit();
+            //Encoding := IndyTextEncoding_8Bit();
+            Encoding := {$IF CompilerVersion < 24}TidTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
 {$IF CompilerVersion < 24}
             FreeEncoding := False;
 {$ENDIF}
