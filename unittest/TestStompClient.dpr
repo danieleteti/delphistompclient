@@ -1,61 +1,238 @@
 program TestStompClient;
 
-{$IFNDEF TESTINSIGHT}
+{$IFDEF FPC}
+{$mode delphi}{$H+}
+{$ELSE}
 {$APPTYPE CONSOLE}
-{$ENDIF}{$STRONGLINKTYPES ON}
+{$ENDIF}
+
 uses
-  System.SysUtils,
-  {$IFDEF TESTINSIGHT}
-  TestInsight.DUnitX,
-  {$ENDIF }
-  DUnitX.Loggers.Console,
-  DUnitX.Loggers.Xml.NUnit,
-  DUnitX.TestFramework,
-  TestStompClientU in 'TestStompClientU.pas',
-  StompClient in '..\StompClient.pas',
-  StompTypes in '..\StompTypes.pas';
+{$IFDEF FPC}
+{$IFDEF UNIX}
+  cthreads,
+{$ENDIF }
+{$ENDIF }
+  SysUtils,
+  StompClient,
+  StompTypes;
+
+procedure Example_Durable_Subscription;
+var
+  StompPub, StompSubscriber: IStompClient;
+  StompFrame: IStompFrame;
+  StompHeaders: IStompHeaders;
+begin
+  StompHeaders := TStompHeaders.Create;
+  StompHeaders.Add(TStompHeaders.Subscription('my-unique-id'));
+
+  WriteLn('==> Example_Durable_Subscription');
+
+  write('> Register a subscriber to "/queue/durable01" using a client-id...');
+  StompSubscriber := TStompClient.CreateAndConnect('127.0.0.1', 61613,
+    'client-id');
+  StompSubscriber.Subscribe('/queue/durable01', amAuto, StompHeaders);
+  StompSubscriber := nil;
+  WriteLn('Now, disconnect from the broker.' + sLineBreak);
+
+  write('> Sending a message to "/queue/durable01"');
+  StompPub := TStompClient.CreateAndConnect;
+  StompPub.Send('/queue/durable01',
+    'this message has been sent when the subscriber client was disconnected');
+  StompPub := nil;
+  WriteLn('... and disconnect' + sLineBreak);
+
+  WriteLn('> The previoous subscriber reconnects using the same client-id');
+  StompSubscriber := TStompClient.CreateAndConnect('127.0.0.1', 61613,
+    'client-id');
+  StompSubscriber.Subscribe('/queue/durable01', amAuto, StompHeaders);
+  // default port
+  repeat
+    StompFrame := StompSubscriber.Receive(1000);
+    if not Assigned(StompFrame) then
+      WriteLn('No Message');
+  until Assigned(StompFrame);
+  WriteLn('> Found the message (even if it was disconnected when the message has been actually published.'
+    + sLineBreak);
+  WriteLn(StompFrame.Body); // Print "Some test message"
+  WriteLn;
+end;
+
+procedure Example_Pub_Subscriber;
+var
+  StompPub, StompSubscriber: IStompClient;
+  StompFrame: IStompFrame;
+begin
+  WriteLn('==> Example_Pub_Subscriber');
+  StompSubscriber := TStompClient.CreateAndConnect;
+  // StompSubscriber.Subscribe('/topic/dummy', amAuto, StompUtils.Headers.Add('auto-delete', 'true'));
+  StompSubscriber.Subscribe('/topic/dummy');
+  StompPub := TStompClient.CreateAndConnect;
+  StompPub.Send('/topic/dummy', 'Some test message');
+  repeat
+    StompFrame := StompSubscriber.Receive(500);
+  until Assigned(StompFrame);
+  WriteLn(StompFrame.Body); // Print "Some test message"
+  WriteLn;
+  StompSubscriber.Unsubscribe('/topic/dummy');
+end;
+
+procedure Example_OnePub_TwoSubscriber;
+var
+  StompPub, StompSub1, StompSub2: IStompClient;
+  StompFrame: IStompFrame;
+begin
+  WriteLn('==> Example_OnePub_TwoSubscriber');
+  // first subscriber
+  StompSub1 := TStompClient.CreateAndConnect;
+  StompSub1.Subscribe('/topic/dummy');
+  while Assigned(StompSub1.Receive(100)) do; // empty the queue
+
+  // second subscriber
+  StompSub2 := TStompClient.CreateAndConnect;
+  StompSub2.Subscribe('/topic/dummy');
+  while Assigned(StompSub2.Receive(100)) do; // empty the queue
+
+  // publish the messages
+  StompPub := TStompClient.CreateAndConnect;
+  write('> Publishing 2 message on "/topic/dummy"...');
+  StompPub.Send('/topic/dummy', 'First test message on a topic');
+  StompPub.Send('/topic/dummy', 'Second test message on a topic');
+  WriteLn('DONE!');
+
+  // read messages from the subscriber1
+  WriteLn('> Reading from SUB1');
+  StompFrame := StompSub1.Receive(2000);
+  if not Assigned(StompFrame) then
+    raise Exception.Create('Cannot read message');
+  WriteLn(StompFrame.Body);
+  StompFrame := StompSub1.Receive(2000);
+  if not Assigned(StompFrame) then
+    raise Exception.Create('Cannot read message');
+  WriteLn(StompFrame.Body);
+
+  // read messages from the subscriber2
+  WriteLn('> Reading from SUB2');
+  StompFrame := StompSub2.Receive(2000);
+  if not Assigned(StompFrame) then
+    raise Exception.Create('Cannot read message');
+  WriteLn(StompFrame.Body);
+  StompFrame := StompSub2.Receive(2000);
+  if not Assigned(StompFrame) then
+    raise Exception.Create('Cannot read message');
+  WriteLn(StompFrame.Body);
+  WriteLn;
+end;
+
+procedure Example_PointToPoint;
+var
+  StompPub, StompSub1, StompSub2: IStompClient;
+  StompFrame: IStompFrame;
+begin
+  WriteLn('==> Example_PointToPoint');
+  StompSub1 := TStompClient.CreateAndConnect; // default port
+  StompSub2 := TStompClient.CreateAndConnect; // default port
+  StompSub1.Subscribe('/queue/PointToPoint');
+  StompSub2.Subscribe('/queue/PointToPoint');
+
+  //
+  StompPub := TStompClient.CreateAndConnect; // default port
+  StompPub.Send('/queue/PointToPoint', 'First test message on a queue');
+  StompPub.Send('/queue/PointToPoint', 'Second test message on a queue');
+
+  StompFrame := StompSub1.Receive(200);
+  if Assigned(StompFrame) then
+    WriteLn(StompFrame.Output);
+  StompFrame := StompSub1.Receive(200);
+  if Assigned(StompFrame) then
+    WriteLn(StompFrame.Output);
+
+  StompFrame := StompSub2.Receive(200);
+  if Assigned(StompFrame) then
+    WriteLn(StompFrame.Output);
+  StompFrame := StompSub2.Receive(200);
+  if Assigned(StompFrame) then
+    WriteLn(StompFrame.Output);
+
+  WriteLn;
+end;
+
+procedure Example_Simple_Queue;
+var
+  lProducer, lConsumer: IStompClient;
+  StompFrame: IStompFrame;
+begin
+  WriteLn('==> Example_Simple_Queue');
+  lConsumer := TStompClient.CreateAndConnect;
+
+  { TODO -oDaniele -cGeneral : Checkthis }
+  // create an auto-delete queue
+  lConsumer.Subscribe('/queue/dummy', amClient,
+    StompUtils.Headers.Add(TStompHeaders.AUTO_DELETE, 'true'));
+
+  // creates a durable queue
+  // lConsumer.Subscribe('/queue/dummy');
+
+  lProducer := TStompClient.CreateAndConnect;
+  lProducer.Send('/queue/dummy', 'Some test message',
+    StompUtils.Headers.Add(TStompHeaders.AUTO_DELETE, 'true'));
+  repeat
+    StompFrame := lConsumer.Receive(500);
+  until Assigned(StompFrame);
+  WriteLn(StompFrame.Body); // Print "Some test message"
+  lConsumer.Ack(StompFrame.MessageID);
+  WriteLn;
+  lConsumer.Unsubscribe('/queue/dummy123');
+end;
+
+type
+  TSimpleProc = procedure;
+
+  TTestItem = record
+    Proc: TSimpleProc;
+    Description: String;
+  end;
 
 var
-  runner : ITestRunner;
-  results : IRunResults;
-  logger : ITestLogger;
-  nunitLogger : ITestLogger;
+  TestItems: array [0 .. 4] of TTestItem = (
+    (
+      Proc: Example_Pub_Subscriber; Description: 'PUB/SUB TEST'),
+    (Proc: Example_Simple_Queue; Description: 'SIMPLE QUEUE TEST'),
+    (Proc: Example_OnePub_TwoSubscriber; Description: 'ONE PUB TWO SUB TEST'),
+    (Proc: Example_PointToPoint; Description: 'POINT TO POINT TEST'),
+    (Proc: Example_Durable_Subscription;
+    Description: 'DURABLE SUBSCRIPTION TEST'));
+
+  TestItem: TTestItem;
+  lFail: Boolean;
+
 begin
-{$IFDEF TESTINSIGHT}
-  TestInsight.DUnitX.RunRegisteredTests;
-  exit;
-{$ENDIF}
+  // yes, this should become a proper DUnitX project...
   try
-    //Check command line options, will exit if invalid
-    TDUnitX.CheckCommandLine;
-    //Create the test runner
-    runner := TDUnitX.CreateRunner;
-    //Tell the runner to use RTTI to find Fixtures
-    runner.UseRTTI := True;
-    //tell the runner how we will log things
-    //Log to the console window
-    logger := TDUnitXConsoleLogger.Create(true);
-    runner.AddLogger(logger);
-    //Generate an NUnit compatible XML File
-    nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
-    runner.AddLogger(nunitLogger);
-    runner.FailsOnNoAsserts := False; //When true, Assertions must be made during tests;
-
-    //Run tests
-    results := runner.Execute;
-    if not results.AllPassed then
-      System.ExitCode := EXIT_ERRORS;
-
-    {$IFNDEF CI}
-    //We don't want this happening when running under CI.
-    if TDUnitX.Options.ExitBehavior = TDUnitXExitBehavior.Pause then
+    lFail := False;
+    for TestItem in TestItems do
     begin
-      System.Write('Done.. press <Enter> key to quit.');
-      System.Readln;
+      try
+        WriteLn(TestItem.Description.PadRight(15) + ''.PadRight(10, '*'));
+        TestItem.Proc;
+      except
+        on E: Exception do
+        begin
+          WriteLn('[' + TestItem.Description + '] FAILED with message ',
+            E.Message);
+          lFail := True;
+        end;
+      end;
     end;
-    {$ENDIF}
+    WriteLn('>> TEST FINISHED <<');
   except
     on E: Exception do
-      System.Writeln(E.ClassName, ': ', E.Message);
+      WriteLn(E.ClassName, ': ', E.Message);
   end;
+  if DebugHook <> 0 then
+    ReadLn;
+  if lFail then
+    ExitCode := 1
+  else
+    ExitCode := 0;
+
 end.
