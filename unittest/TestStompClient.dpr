@@ -13,8 +13,7 @@ uses
 {$ENDIF }
 {$ENDIF }
   SysUtils,
-  StompClient,
-  StompTypes;
+  StompClient;
 
 procedure Example_Durable_Subscription;
 var

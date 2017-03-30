@@ -12,7 +12,6 @@ object SendMessageMainForm: TSendMessageMainForm
   Font.Style = []
   OldCreateOrder = False
   OnCreate = FormCreate
-  OnDestroy = FormDestroy
   DesignSize = (
     612
     385)

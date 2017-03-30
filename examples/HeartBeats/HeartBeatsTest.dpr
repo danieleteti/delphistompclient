@@ -6,7 +6,6 @@ program HeartBeatsTest;
 
 
 uses
-  StompTypes in '..\..\StompTypes.pas',
   StompClient in '..\..\StompClient.pas', System.Classes, System.SysUtils;
 
 procedure Main;
@@ -16,12 +15,12 @@ var
 const
   DESTINATION = '/topic/pippo';
 begin
-  lSTOMP := TStompClient.Create;
-  lSTOMP
+  lSTOMP := StompUtils.StompClient
     .SetHeartBeat(500, 0) // very low outgoing heartbeat interval
     .SetUserName('guest')
     .SetPassword('guest')
-    .Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+    .SetAcceptVersion(TStompAcceptProtocol.Ver_1_1)
+    .Connect;
   WriteLn('PROTOCOL: ', lSTOMP.GetProtocolVersion);
   WriteLn('SERVER  : ', lSTOMP.GetServer);
   WriteLn('SESSION : ', lSTOMP.GetSession);
@@ -34,11 +33,11 @@ begin
       lSTOMP: IStompClient;
       I: Integer;
     begin
-      lSTOMP := TStompClient.Create;
-      lSTOMP
+      lSTOMP := StompUtils.StompClient
         .SetUserName('guest')
         .SetPassword('guest')
-        .Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+        .SetAcceptVersion(TStompAcceptProtocol.Ver_1_1)
+        .Connect;
       for I := 1 to 10 do
       begin
         lSTOMP.Send(DESTINATION, TGuid.NewGuid.ToString + ' ' + DateTimeToStr(now));

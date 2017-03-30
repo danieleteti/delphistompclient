@@ -10,18 +10,18 @@ program consumer;
 
 uses
   System.SysUtils,
-  StompClient in '..\..\StompClient.pas',
-  StompTypes in '..\..\StompTypes.pas';
+  StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
-  lClient: TStompClient;
+  lClient: IStompClient;
   lStompFrame: IStompFrame;
   lMessage: string;
 begin
-  lClient := TStompClient.Create;
-  lClient.SetHeartBeat(0, 0);
-  lClient.Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+  lClient := StompUtils.StompClient
+               .SetHeartBeat(0, 0)
+               .SetAcceptVersion(TStompAcceptProtocol.Ver_1_1)
+               .Connect;
   WriteLn('Subscribing to queue "myjobqueue"');
   lClient.Subscribe('/topic/mytopic',
     TAckMode.amClient

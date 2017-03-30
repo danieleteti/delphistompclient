@@ -3,7 +3,7 @@ unit TestStompClientU;
 interface
 
 uses
-  DUnitX.TestFramework, StompClient, StompTypes, System.Diagnostics, System.SysUtils;
+  DUnitX.TestFramework, StompClient, System.Diagnostics, System.SysUtils;
 
 type
 
@@ -45,9 +45,9 @@ var
   lSTOMP: IStompClient;
   I: Integer;
 begin
-  lSTOMP := TStompClient.Create;
+  lSTOMP := StompUtils.StompClient;
   lSTOMP.SetHeartBeat(1000, 0);
-  lSTOMP.Connect('127.0.0.1', 61613, '', TStompAcceptProtocol.Ver_1_1);
+  lSTOMP.Connect('127.0.0.1', 61613, '', '', TStompAcceptProtocol.Ver_1_1);
   lSTOMP.Subscribe('/topic/mytopic');
   Sleep(2000);
   lSTOMP.Send('/topic/mytopic', 'Hello World1');
