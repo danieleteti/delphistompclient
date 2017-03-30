@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
-  System.Classes, Vcl.Graphics,
+  System.Classes, Vcl.Graphics, System.UITypes,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient,
   ThreadReceiver;
 
@@ -44,7 +44,6 @@ implementation
 
 {$R *.dfm}
 
-uses System.UITypes;
 
 procedure TReceiverMainForm.BeforeSendFrame(AFrame: IStompFrame);
 begin
