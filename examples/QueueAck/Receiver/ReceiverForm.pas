@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics, System.UITypes,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient, StompTypes,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient,
   ThreadReceiver;
 
 type
@@ -30,7 +30,7 @@ type
     procedure UnsubscribeButtonClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
   private
-    StompClient: TStompClient;
+    StompClient: IStompClient;
     StompFrame: IStompFrame;
     ThReceiver: TThreadReceiver;
     procedure BeforeSendFrame(AFrame: IStompFrame);
@@ -52,7 +52,7 @@ end;
 
 procedure TReceiverMainForm.FormCreate(Sender: TObject);
 begin
-  StompClient := TStompClient.Create;
+  StompClient := StompUtils.StompClient;
   try
     StompClient.Connect;
   except
@@ -62,7 +62,7 @@ begin
         ('Cannot connect to Apollo server. Run the server and restart the application');
     end;
   end;
-  StompClient.OnBeforeSendFrame := BeforeSendFrame;
+  StompClient.SetOnBeforeSendFrame(BeforeSendFrame);
   StompFrame := StompUtils.NewFrame();
   ThReceiver := TThreadReceiver.Create(True);
   ThReceiver.StompClient := StompClient;
@@ -71,7 +71,6 @@ end;
 procedure TReceiverMainForm.FormDestroy(Sender: TObject);
 begin
   ThReceiver.Free;
-  StompClient.Free;
 end;
 
 procedure TReceiverMainForm.SendAckButtonClick(Sender: TObject);

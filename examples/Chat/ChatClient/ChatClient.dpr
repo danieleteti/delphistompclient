@@ -3,8 +3,7 @@ program ChatClient;
 uses
   Forms,
   MainFormClient in 'MainFormClient.pas' {Form5},
-  StompClient in '..\..\..\StompClient.pas',
-  StompTypes in '..\..\..\StompTypes.pas';
+  StompClient in '..\..\..\StompClient.pas';
 
 {$R *.res}
 

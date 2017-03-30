@@ -73,13 +73,14 @@ def main(projects):
 def delphistompclient_copyright():
   print(Style.BRIGHT + Fore.WHITE + "------------------------------------------------------------------------------------------")	
   print(Fore.RED + "                 ** Delphi STOMP Client Building System **")
-  print(Fore.WHITE + " Delphi STOMP Client is CopyRight (2010-2016) of Daniele Teti d.teti@bittime.it")
+  print(Fore.WHITE + " Delphi STOMP Client is CopyRight (2010-2017) of Daniele Teti d.teti@bittime.it")
   print(Fore.RESET + "------------------------------------------------------------------------------------------\n")
 
 ## MAIN ##
 projects = glob.glob("examples\**\**\*.dproj")
 projects += glob.glob("examples\**\*.dproj")
 projects += glob.glob("tutorial\**\*.dproj")
+projects += glob.glob("unittest\**\*.dproj")
 
 main(projects)
 print(Style.RESET_ALL)

@@ -10,14 +10,14 @@ program producer;
 
 uses
   System.SysUtils,
-  StompClient, StompTypes;
+  StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
-  lClient: TStompClient;
+  lClient: IStompClient;
   lMessage: string;
 begin
-  lClient := TStompClient.Create;
+  lClient := StompUtils.StompClient;
   lClient.Connect();
   WriteLn('Sending messages to queue "myjobqueue"');
   WriteLn('NOTE: Consumers will wait a second for each "." present in the message.');

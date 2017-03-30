@@ -15,8 +15,7 @@ uses
 {$ENDIF}
 {$ENDIF}
   SysUtils,
-  StompClient,
-  StompTypes;
+  StompClient;
 
 procedure Example_Durable_Subscription;
 var
@@ -24,26 +23,26 @@ var
   StompFrame: IStompFrame;
   StompHeaders: IStompHeaders;
 begin
-  StompHeaders := TStompHeaders.Create;
-  StompHeaders.Add(TStompHeaders.Subscription('my-unique-id'));
+  StompHeaders := StompUtils.Headers;
+  StompHeaders.Add(StompUtils.NewDurableSubscriptionHeader('my-unique-id'));
 
   WriteLn('==> Example_Durable_Subscription');
 
   write('> Register a subscriber to "/queue/durable01" using a client-id...');
-  StompSubscriber := TStompClient.CreateAndConnect('127.0.0.1', 61613, 'client-id');
+  StompSubscriber := StompUTils.StompClientAndConnect('127.0.0.1', 61613, '', 'client-id');
   StompSubscriber.Subscribe('/queue/durable01', amAuto, StompHeaders);
   StompSubscriber := nil;
   WriteLn('Now, disconnect from the broker.' + sLineBreak);
 
   write('> Sending a message to "/queue/durable01"');
-  StompPub := TStompClient.CreateAndConnect;
+  StompPub := StompUTils.StompClientAndConnect;
   StompPub.Send('/queue/durable01',
     'this message has been sent when the subscriber client was disconnected');
   StompPub := nil;
   WriteLn('... and disconnect' + sLineBreak);
 
   WriteLn('> The previoous subscriber reconnects using the same client-id');
-  StompSubscriber := TStompClient.CreateAndConnect('127.0.0.1', 61613, 'client-id');
+  StompSubscriber := StompUTils.StompClientAndConnect('127.0.0.1', 61613, '', 'client-id');
   StompSubscriber.Subscribe('/queue/durable01', amAuto, StompHeaders);
   // default port
   repeat
@@ -63,10 +62,10 @@ var
   StompFrame: IStompFrame;
 begin
   WriteLn('==> Example_Pub_Subscriber');
-  StompSubscriber := TStompClient.CreateAndConnect;
+  StompSubscriber := StompUTils.StompClientAndConnect;
   // StompSubscriber.Subscribe('/topic/dummy', amAuto, StompUtils.Headers.Add('auto-delete', 'true'));
   StompSubscriber.Subscribe('/topic/dummy');
-  StompPub := TStompClient.CreateAndConnect;
+  StompPub := StompUTils.StompClientAndConnect;
   StompPub.Send('/topic/dummy', 'Some test message');
   repeat
     StompFrame := StompSubscriber.Receive(500);
@@ -83,17 +82,17 @@ var
 begin
   WriteLn('==> Example_OnePub_TwoSubscriber');
   // first subscriber
-  StompSub1 := TStompClient.CreateAndConnect;
+  StompSub1 := StompUTils.StompClientAndConnect;
   StompSub1.Subscribe('/topic/dummy');
   while Assigned(StompSub1.Receive(100)) do; // empty the queue
 
   // second subscriber
-  StompSub2 := TStompClient.CreateAndConnect;
+  StompSub2 := StompUTils.StompClientAndConnect;
   StompSub2.Subscribe('/topic/dummy');
   while Assigned(StompSub2.Receive(100)) do; // empty the queue
 
   // publish the messages
-  StompPub := TStompClient.CreateAndConnect;
+  StompPub := StompUTils.StompClientAndConnect;
   write('> Publishing 2 message on "/topic/dummy"...');
   StompPub.Send('/topic/dummy', 'First test message on a topic');
   StompPub.Send('/topic/dummy', 'Second test message on a topic');
@@ -129,13 +128,13 @@ var
   StompFrame: IStompFrame;
 begin
   WriteLn('==> Example_PointToPoint');
-  StompSub1 := TStompClient.CreateAndConnect; // default port
-  StompSub2 := TStompClient.CreateAndConnect; // default port
+  StompSub1 := StompUTils.StompClientAndConnect; // default port
+  StompSub2 := StompUTils.StompClientAndConnect; // default port
   StompSub1.Subscribe('/queue/PointToPoint');
   StompSub2.Subscribe('/queue/PointToPoint');
 
   //
-  StompPub := TStompClient.CreateAndConnect; // default port
+  StompPub := StompUtils.StompClientAndConnect; // default port
   StompPub.Send('/queue/PointToPoint', 'First test message on a queue');
   StompPub.Send('/queue/PointToPoint', 'Second test message on a queue');
 
@@ -162,19 +161,19 @@ var
   StompFrame: IStompFrame;
 begin
   WriteLn('==> Example_Simple_Queue');
-  lConsumer := TStompClient.CreateAndConnect;
+  lConsumer := StompUtils.StompClientAndConnect;
 
   { TODO -oDaniele -cGeneral : Checkthis }
   // create an auto-delete queue
   lConsumer.Subscribe('/queue/dummy', amClient,
-    StompUtils.Headers.Add(TStompHeaders.AUTO_DELETE, 'true'));
+    StompUtils.Headers.Add(StompHeaders.AUTO_DELETE, 'true'));
 
   // creates a durable queue
   // lConsumer.Subscribe('/queue/dummy');
 
-  lProducer := TStompClient.CreateAndConnect;
+  lProducer := StompUtils.StompClientAndConnect;
   lProducer.Send('/queue/dummy', 'Some test message',
-    StompUtils.Headers.Add(TStompHeaders.AUTO_DELETE, 'true'));
+    StompUtils.Headers.Add(StompHeaders.AUTO_DELETE, 'true'));
   repeat
     StompFrame := lConsumer.Receive(500);
   until Assigned(StompFrame);

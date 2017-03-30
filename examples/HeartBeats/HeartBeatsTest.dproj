@@ -133,7 +133,6 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="..\..\StompTypes.pas"/>
         <DCCReference Include="..\..\StompClient.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

@@ -5,8 +5,7 @@ program teststompclient;
 uses
   MainU in 'MainU.pas',
   SysUtils,
-  StompClient in '..\StompClient.pas',
-  StompTypes in '..\StompTypes.pas';
+  StompClient in '..\StompClient.pas';
 
 const
   SERVERNAME =
@@ -16,7 +15,7 @@ const
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
-    Main(SERVERNAME, STOMP_Version_1_0);
+    Main(SERVERNAME, Ver_1_0);
     //Main(SERVERNAME, STOMP_Version_1_1); // Your STOMP server supports protocol 1.1 ?
     //MainWithTransaction;
     //Test_Unicode_Chars;

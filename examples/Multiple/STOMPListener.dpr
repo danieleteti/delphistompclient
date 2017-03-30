@@ -2,9 +2,8 @@ program STOMPListener;
 
 uses
   Vcl.Forms,
-  MainForm in 'MainForm.pas' {Form4} ,
-  StompClient in '..\..\StompClient.pas',
-  StompTypes in '..\..\StompTypes.pas';
+  MainForm in 'MainForm.pas' {Form4},
+  StompClient in '..\..\StompClient.pas';
 
 {$R *.res}
 
