@@ -792,23 +792,26 @@ var
   LFrame: IStompFrame;
   LTerminateListener: Boolean;
 begin
-  LTerminateListener := False;
-  while (not Terminated) and (not LTerminateListener) do
-  begin
-    if FStompClient.Receive(LFrame, 1000) then
+  try
+    LTerminateListener := False;
+    while (not Terminated) and (not LTerminateListener) do
     begin
-      TThread.Synchronize(nil,
-        procedure
-        begin
-          FStompClientListener.OnMessage(LFrame, LTerminateListener);
-        end);
+      if FStompClient.Receive(LFrame, 1000) then
+      begin
+        TThread.Synchronize(nil,
+          procedure
+          begin
+            FStompClientListener.OnMessage(LFrame, LTerminateListener);
+          end);
+      end;
     end;
+  finally
+    TThread.Synchronize(nil,
+      procedure
+      begin
+        FStompClientListener.OnListenerStopped(FStompClient);
+      end);
   end;
-  TThread.Synchronize(nil,
-    procedure
-    begin
-      FStompClientListener.OnListenerStopped(FStompClient);
-    end);
 end;
 
 { TStompClient }
