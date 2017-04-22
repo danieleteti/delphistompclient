@@ -42,7 +42,7 @@ uses
   blcksock,
 
 {$ENDIF}
-  Classes;
+  Classes, System.Generics.Collections;
 
 const
   LINE_END: char = #10;
@@ -65,12 +65,14 @@ type
   EStomp = class(Exception)
   end;
 
-  TKeyValue = record
+  TKeyValue = class
+  public
     Key: string;
     Value: string;
+    constructor Create(const Key: String; const Value: String);
   end;
 
-  PKeyValue = ^TKeyValue;
+//  PKeyValue = ^TKeyValue;
 
   TSenderFrameEvent = procedure(AFrame: IStompFrame) of object;
 
@@ -234,7 +236,7 @@ uses
   // Windows,   // Remove windows unit for compiling on ios
   IdGlobal,
   IdGlobalProtocols,
-  Character, Winapi.Windows;
+  Character;
 {$ENDIF}
 
 type
@@ -445,7 +447,7 @@ type
 
   TStompHeaders = class(TInterfacedObject, IStompHeaders)
   private
-    FList: TList;
+    FList: TObjectList<TKeyValue>;
     function GetItems(index: Cardinal): TKeyValue;
     procedure SetItems(index: Cardinal; const Value: TKeyValue);
 
@@ -605,13 +607,8 @@ end;
 { TStompHeaders }
 
 function TStompHeaders.Add(Key, Value: string): IStompHeaders;
-var
-  p: PKeyValue;
 begin
-  New(p);
-  p^.Key := Key;
-  p^.Value := Value;
-  FList.Add(p);
+  FList.Add(TKeyValue.Create(Key, Value));
   Result := self;
 end;
 
@@ -628,16 +625,11 @@ end;
 constructor TStompHeaders.Create;
 begin
   inherited;
-  FList := TList.Create;
+  FList := TObjectList<TKeyValue>.Create(true);
 end;
 
 destructor TStompHeaders.Destroy;
-var
-  i: Integer;
 begin
-  if FList.Count > 0 then
-    for i := 0 to FList.Count - 1 do
-      Dispose(PKeyValue(FList[i]));
   FList.Free;
   inherited;
 end;
@@ -655,7 +647,7 @@ end;
 
 function TStompHeaders.GetItems(index: Cardinal): TKeyValue;
 begin
-  Result := PKeyValue(FList[index])^;
+  Result := FList[index];
 end;
 
 function TStompHeaders.IndexOf(Key: string): Integer;
@@ -700,7 +692,6 @@ var
   p: Integer;
 begin
   p := IndexOf(Key);
-  Dispose(PKeyValue(FList[p]));
   FList.Delete(p);
   Result := self;
 end;
@@ -716,13 +707,8 @@ var
   p: Integer;
 begin
   p := IndexOf(Value.Key);
-  if p > -1 then
-  begin
-    PKeyValue(FList[p])^.Key := Value.Key;
-    PKeyValue(FList[p])^.Value := Value.Value;
-  end
-  else
-    raise EStomp.Create('Error SetItems');
+  FList[p].Free;
+  FList[p] := Value;
 end;
 
 class function TStompHeaders.Subscription(
@@ -1930,6 +1916,14 @@ end;
 class function StompUtils.NewFrame: IStompFrame;
 begin
   Result := TStompFrame.Create;
+end;
+
+
+constructor TKeyValue.Create(const Key: String; const Value: String);
+begin
+  inherited Create;
+  Self.Key := Key;
+  Self.Value := Value;
 end;
 
 end.
