@@ -636,8 +636,7 @@ end;
 
 class function TStompHeaders.Durable(const Value: Boolean): TKeyValue;
 begin
-  Result.Key := 'durable';
-  Result.Value := LowerCase(BoolToStr(Value, true));
+  Result := TKeyValue.Create('durable', LowerCase(BoolToStr(Value, true)));
 end;
 
 function TStompHeaders.GetAt(const index: Integer): TKeyValue;
@@ -683,8 +682,7 @@ end;
 
 class function TStompHeaders.Persistent(const Value: Boolean): TKeyValue;
 begin
-  Result.Key := 'persistent';
-  Result.Value := LowerCase(BoolToStr(Value, true));
+  Result := TKeyValue.Create('persistent', LowerCase(BoolToStr(Value, true)));
 end;
 
 function TStompHeaders.Remove(Key: string): IStompHeaders;
@@ -698,8 +696,7 @@ end;
 
 class function TStompHeaders.ReplyTo(const DestinationName: string): TKeyValue;
 begin
-  Result.Key := 'reply-to';
-  Result.Value := DestinationName;
+  Result := TKeyValue.Create('reply-to', DestinationName);
 end;
 
 procedure TStompHeaders.SetItems(index: Cardinal; const Value: TKeyValue);
@@ -714,8 +711,7 @@ end;
 class function TStompHeaders.Subscription(
   const SubscriptionName: string): TKeyValue;
 begin
-  Result.Key := 'id';
-  Result.Value := SubscriptionName;
+  Result := TKeyValue.Create('id', SubscriptionName);
 end;
 
 function TStompHeaders.Value(Key: string): string;
