@@ -1280,7 +1280,9 @@ begin
 end;
 
 function TStompClient.Receive(ATimeout: Integer): IStompFrame;
-
+// Considering that no one apparently discovered this bug (CreateFrame called with parameters)
+// in the Synapse's version, one might consider whether one should deprecate Synapse support
+// all together.
 {$IFDEF USESYNAPSE}
   function InternalReceiveSynapse(ATimeout: Integer): IStompFrame;
   var
@@ -1322,7 +1324,7 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
         end;
         if not tout then
         begin
-          Result := StompUtils.CreateFrame(s + CHAR0);
+          Result := StompUtils.CreateFrameWithBuffer(s + CHAR0);
         end;
       finally
         s := '';
@@ -1441,12 +1443,10 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               FTCP.Socket.ReadLn(#0 + LF);
             end
             else
-
             begin
               // no length specified, body terminated by frame terminating null
               lLine := FTCP.Socket.ReadLn(#0 + LF, Encoding);
               lSBuilder.Append(lLine);
-
             end;
             lSBuilder.Append(#0);
 {$IF CompilerVersion < 24}
