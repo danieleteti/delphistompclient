@@ -1370,10 +1370,10 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
   function InternalReceiveINDY(ATimeout: Integer): IStompFrame;
   var
     lLine: string;
-    //lSBuilder: TStringBuilder;
     SStream: TStringStream;
     Buffer: TBytes;
     AsBytes: Boolean;
+    ReadNull: Boolean;
     Headers: TIdHeaderList;
     ContentLength: Integer;
     Charset: string;
@@ -1387,12 +1387,12 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 {$ENDIF}
   begin
     Result := nil;
-    //lSBuilder := TStringBuilder.Create(1024 * 4);
     SStream := TStringStream.Create;
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
 {$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
+      AsBytes := true;
 
       try
         lTimestampFirstReadLn := Now;
@@ -1420,15 +1420,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 
         if lLine = '' then
           Exit(nil);
-        //lSBuilder.Append(lLine + LF);
         SStream.WriteString(lLine + LF);
+        ReadNull := false;
 
         // read headers
         Headers := TIdHeaderList.Create(QuotePlain);
         try
           repeat
             lLine := FTCP.Socket.ReadLn;
-            //lSBuilder.Append(lLine + LF);
             SStream.WriteString(lLine + LF);
             if lLine = '' then
               Break;
@@ -1458,35 +1457,38 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               if ContentLength > 0 then
               begin
                 lLine := FTCP.Socket.ReadString(ContentLength, Encoding);
-                //lSBuilder.Append(lLine);
                 SStream.WriteString(lLine);
-                // frame must still be terminated by a null
-                FTCP.Socket.ReadLn(#0 + LF);
               end
               else
               begin
                 // no length specified, body terminated by frame terminating null
                 lLine := FTCP.Socket.ReadLn(#0 + LF, Encoding);
-                //lSBuilder.Append(lLine);
                 SStream.WriteString(lLine);
+                ReadNull := true;
               end;
-//              lSBuilder.Append(#0);
-              SStream.WriteString(#0);
 {$IF CompilerVersion < 24}
             finally
               Encoding.Free;
             end;
 {$ENDIF}
-//            Result := StompUtils.CreateFrameWithBuffer(lSBuilder.ToString);
             AsBytes := false;
           end
           else
           begin
             if ContentLength > 0 then
-              FTCP.Socket.ReadStream(SStream, ContentLength, true)
+              FTCP.Socket.ReadStream(SStream, ContentLength, false)
             else
-              FTCP.Socket.ReadStream(SStream, -1, true);
+            begin
+              if FTCP.Socket.CheckForDataOnSource(ATimeOut) then
+                FTCP.Socket.ReadStream(SStream, -1, true);
+            end;
             AsBytes := true;
+          end;
+          if not ReadNull then
+          begin
+            // frame must still be terminated by a null
+            SStream.WriteString(#0);
+            FTCP.Socket.ReadLn(#0 + LF);
           end;
         finally
           Headers.Free;
@@ -1508,7 +1510,8 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 
       if AsBytes then
       begin
-        SStream.Read(Buffer, SStream.Size);
+        SetLength(Buffer, SStream.Size);
+        SStream.Read(Buffer[0], SStream.Size);
         Result := StompUtils.CreateFrameWithBuffer(Buffer);
       end
       else
@@ -1964,7 +1967,7 @@ var
   sContLen: string;
 begin
   Result := TStompFrame.Create;
-  i := 1;
+  i := 0;
   try
     Result.Command := TEncoding.UTF8.GetString(GetByteLine(Buf, i)); // convert to string
     while true do
@@ -1979,11 +1982,12 @@ begin
       Value := Copy(headerLine, p + 1, Length(headerLine) - p);
       Result.Headers.Add(Key, Value);
     end;
+    SetLength(other, Length(buf) - i);
     other := Copy(Buf, i, high(Integer));
     sContLen := Result.Headers.Value(StompHeaders.CONTENT_LENGTH);
     if (sContLen <> '') then
     begin
-      if other[Length(other)] <> 0 then
+      if other[Length(other)-1] <> 0 then
         raise EStomp.Create('frame no ending');
       contLen := StrToInt(sContLen);
       other := Copy(Buf, 1, Length(other) - 1);
@@ -2030,3 +2034,4 @@ begin
 end;
 
 end.
+
