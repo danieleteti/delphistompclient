@@ -1990,7 +1990,7 @@ begin
       if other[Length(other)-1] <> 0 then
         raise EStomp.Create('frame no ending');
       contLen := StrToInt(sContLen);
-      other := Copy(Buf, 1, Length(other) - 1);
+      other := Copy(other, 0, Length(other) - 1);
 
       if Length(other) <> contLen then
         // there is still the command_end
@@ -1999,7 +1999,7 @@ begin
     end
     else
     begin
-      Result.BytesBody := Copy(Buf, 1, Length(other) - 1);
+      Result.BytesBody := Copy(other, 0, Length(other) - 1);
     end;
   except
     on EStomp do
