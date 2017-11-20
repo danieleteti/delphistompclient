@@ -217,7 +217,7 @@ type
     class function NewReplyToHeader(const DestinationName: string): TKeyValue;
     class function CreateListener(const StompClient: IStompClient;
       const StompClientListener: IStompClientListener): IStompListener;
-    class function StripLastChar(Buf: string; LastChar: char): string;
+    class function StripLastChar(Buf: string): string;
     class function CreateFrame: IStompFrame;
     class function CreateFrameWithBuffer(Buf: string): IStompFrame; overload;
     class function CreateFrameWithBuffer(Buf: TBytes): IStompFrame; overload;
@@ -1851,7 +1851,7 @@ begin
   Result := TStompClientListener.Create(StompClient, StompClientListener);
 end;
 
-class function StompUtils.StripLastChar(Buf: string; LastChar: char): string;
+class function StompUtils.StripLastChar(Buf: string): string;
 var
   p: Integer;
 begin
@@ -1925,7 +1925,7 @@ begin
       if other[Length(other)] <> #0 then
         raise EStomp.Create('frame no ending');
       contLen := StrToInt(sContLen);
-      other := StripLastChar(other, COMMAND_END);
+      other := StripLastChar(other);
 
       if TEncoding.UTF8.GetByteCount(other) <> contLen then
         // there is still the command_end
@@ -1934,7 +1934,7 @@ begin
     end
     else
     begin
-      Result.Body := StripLastChar(other, COMMAND_END)
+      Result.Body := StripLastChar(other);
     end;
   except
     on EStomp do
