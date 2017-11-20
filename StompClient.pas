@@ -1207,7 +1207,7 @@ begin
 
   // If the frame has some content, then set the length of that content.
   if (AFrame.ContentLength > 0) then
-    AFrame.Headers.Add('content-length', intToStr(AFrame.ContentLength));
+    AFrame.Headers.Add(StompHeaders.CONTENT_LENGTH, intToStr(AFrame.ContentLength));
 end;
 
 procedure TStompClient.Nack(const MessageID, subscriptionId, TransactionIdentifier: string);
@@ -1406,9 +1406,9 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
           //
           // NOTE: non-text data really should be read as a Stream instead of a String!!!
           //
-          if IsHeaderMediaType(Headers.Values['content-type'], 'text') then
+          if IsHeaderMediaType(Headers.Values[StompHeaders.CONTENT_TYPE], 'text') then
           begin
-            Charset := Headers.Params['content-type', 'charset'];
+            Charset := Headers.Params[StompHeaders.CONTENT_TYPE, 'charset'];
             if Charset = '' then
               Charset := 'utf-8';
             Encoding := CharsetToEncoding(Charset);
@@ -1428,10 +1428,10 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 {$IF CompilerVersion < 24}
           try
 {$ENDIF}
-            if Headers.IndexOfName('content-length') <> -1 then
+            if Headers.IndexOfName(StompHeaders.CONTENT_LENGTH) <> -1 then
             begin
               // length specified, read exactly that many bytes
-              ContentLength := IndyStrToInt(Headers.Values['content-length']);
+              ContentLength := IndyStrToInt(Headers.Values[StompHeaders.CONTENT_LENGTH]);
               if ContentLength > 0 then
               begin
                 lLine := FTCP.Socket.ReadString(ContentLength, Encoding);
@@ -1873,7 +1873,7 @@ begin
       Result.Headers.Add(Key, Value);
     end;
     other := Copy(Buf, i, high(Integer));
-    sContLen := Result.Headers.Value('content-length');
+    sContLen := Result.Headers.Value(StompHeaders.CONTENT_LENGTH);
     if (sContLen <> '') then
     begin
       if other[Length(other)] <> #0 then
