@@ -46,6 +46,7 @@ uses
 
 const
   LINE_END: char = #10;
+  BYTE_LINE_END: Byte = 10;
   COMMAND_END: char = #0;
   DEFAULT_STOMP_HOST = '127.0.0.1';
   DEFAULT_STOMP_PORT = 61613;
@@ -218,7 +219,8 @@ type
       const StompClientListener: IStompClientListener): IStompListener;
     class function StripLastChar(Buf: string; LastChar: char): string;
     class function CreateFrame: IStompFrame;
-    class function CreateFrameWithBuffer(Buf: string): IStompFrame;
+    class function CreateFrameWithBuffer(Buf: string): IStompFrame; overload;
+    class function CreateFrameWithBuffer(Buf: TBytes): IStompFrame; overload;
     class function AckModeToStr(AckMode: TAckMode): string;
     class function NewHeaders: IStompHeaders; deprecated 'Use Headers instead';
     class function Headers: IStompHeaders;
@@ -595,6 +597,33 @@ begin
   end;
 
   if (Buf[i] = LINE_END) then
+  begin
+    Result := Copy(Buf, From, i - From);
+    From := i + 1;
+    exit;
+  end
+  else
+    raise EStomp.Create('End of Line not found.');
+end;
+
+function GetByteLine(Buf: TBytes; var From: Integer): TBytes;
+var
+  i: Integer;
+begin
+  if (From > Length(Buf)) then
+    raise EStomp.Create('From out of bound.');
+
+  i := From;
+
+  while (i <= Length(Buf)) do
+  begin
+    if (Buf[i] <> BYTE_LINE_END) then
+      inc(i)
+    else
+      break;
+  end;
+
+  if (Buf[i] = BYTE_LINE_END) then
   begin
     Result := Copy(Buf, From, i - From);
     From := i + 1;
@@ -1341,7 +1370,10 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
   function InternalReceiveINDY(ATimeout: Integer): IStompFrame;
   var
     lLine: string;
-    lSBuilder: TStringBuilder;
+    //lSBuilder: TStringBuilder;
+    SStream: TStringStream;
+    Buffer: TBytes;
+    AsBytes: Boolean;
     Headers: TIdHeaderList;
     ContentLength: Integer;
     Charset: string;
@@ -1355,7 +1387,8 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 {$ENDIF}
   begin
     Result := nil;
-    lSBuilder := TStringBuilder.Create(1024 * 4);
+    //lSBuilder := TStringBuilder.Create(1024 * 4);
+    SStream := TStringStream.Create;
     try
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
@@ -1387,15 +1420,16 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
 
         if lLine = '' then
           Exit(nil);
-        lSBuilder.Append(lLine + LF);
+        //lSBuilder.Append(lLine + LF);
+        SStream.WriteString(lLine + LF);
 
         // read headers
         Headers := TIdHeaderList.Create(QuotePlain);
-
         try
           repeat
             lLine := FTCP.Socket.ReadLn;
-            lSBuilder.Append(lLine + LF);
+            //lSBuilder.Append(lLine + LF);
+            SStream.WriteString(lLine + LF);
             if lLine = '' then
               Break;
             // in case of duplicated header, only the first is considered
@@ -1404,10 +1438,14 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               Headers.Add(lLine);
           until False;
 
+          ContentLength := -1;
+          if Headers.IndexOfName(StompHeaders.CONTENT_LENGTH) <> -1 then
+          begin
+            // length specified, read exactly that many bytes
+            ContentLength := IndyStrToInt(Headers.Values[StompHeaders.CONTENT_LENGTH]);
+          end;
+
           // read body
-          //
-          // NOTE: non-text data really should be read as a Stream instead of a String!!!
-          //
           if IsHeaderMediaType(Headers.Values[StompHeaders.CONTENT_TYPE], 'text') then
           begin
             Charset := Headers.Params[StompHeaders.CONTENT_TYPE, 'charset'];
@@ -1415,63 +1453,71 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
               Charset := 'utf-8';
             Encoding := CharsetToEncoding(Charset);
 {$IF CompilerVersion < 24}
-            FreeEncoding := True;
+            try
 {$ENDIF}
-          end
-          else
-          begin
-            //Encoding := IndyTextEncoding_8Bit();
-            Encoding := {$IF CompilerVersion < 24}TidTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
-{$IF CompilerVersion < 24}
-            FreeEncoding := False;
-{$ENDIF}
-          end;
-
-{$IF CompilerVersion < 24}
-          try
-{$ENDIF}
-            if Headers.IndexOfName(StompHeaders.CONTENT_LENGTH) <> -1 then
-            begin
-              // length specified, read exactly that many bytes
-              ContentLength := IndyStrToInt(Headers.Values[StompHeaders.CONTENT_LENGTH]);
               if ContentLength > 0 then
               begin
                 lLine := FTCP.Socket.ReadString(ContentLength, Encoding);
-                lSBuilder.Append(lLine);
+                //lSBuilder.Append(lLine);
+                SStream.WriteString(lLine);
+                // frame must still be terminated by a null
+                FTCP.Socket.ReadLn(#0 + LF);
+              end
+              else
+              begin
+                // no length specified, body terminated by frame terminating null
+                lLine := FTCP.Socket.ReadLn(#0 + LF, Encoding);
+                //lSBuilder.Append(lLine);
+                SStream.WriteString(lLine);
               end;
-              // frame must still be terminated by a null
-              FTCP.Socket.ReadLn(#0 + LF);
-            end
-            else
-            begin
-              // no length specified, body terminated by frame terminating null
-              lLine := FTCP.Socket.ReadLn(#0 + LF, Encoding);
-              lSBuilder.Append(lLine);
-            end;
-            lSBuilder.Append(#0);
+//              lSBuilder.Append(#0);
+              SStream.WriteString(#0);
 {$IF CompilerVersion < 24}
-          finally
-            if FreeEncoding then
+            finally
               Encoding.Free;
-          end;
+            end;
 {$ENDIF}
+//            Result := StompUtils.CreateFrameWithBuffer(lSBuilder.ToString);
+            AsBytes := false;
+          end
+          else
+          begin
+            FTCP.Socket.ReadStream(SStream);
+            AsBytes := true;
+          end;
         finally
           Headers.Free;
         end;
       except
         on E: Exception do
         begin
-          if lSBuilder.Length > 0 then
-            raise EStomp.Create(E.message + sLineBreak + lSBuilder.toString)
+          if SStream.Size > 0 then
+          begin
+            SStream.Position := 0;
+            raise EStomp.Create(E.message + sLineBreak + SStream.ReadString(SStream.Size))
+          end
           else
             raise;
         end;
       end;
-      Result := StompUtils.CreateFrameWithBuffer(lSBuilder.toString);
+
+      SStream.Position := 0;
+
+      if AsBytes then
+      begin
+        SStream.Read(Buffer, SStream.Size);
+        Result := StompUtils.CreateFrameWithBuffer(Buffer);
+      end
+      else
+      begin
+        Result := StompUtils.CreateFrameWithBuffer(SStream.ReadString(SStream.Size));
+      end;
+
       if Result.Command = 'ERROR' then
         raise EStomp.Create(FormatErrorFrame(Result));
     finally
-      lSBuilder.Free;
+//      lSBuilder.Free;
+      SStream.Free;
     end;
   end;
 {$ENDIF}
@@ -1889,6 +1935,64 @@ begin
     else
     begin
       Result.Body := StripLastChar(other, COMMAND_END)
+    end;
+  except
+    on EStomp do
+    begin
+      // ignore
+      Result := nil;
+    end;
+    on e: Exception do
+    begin
+      Result := nil;
+      raise EStomp.Create(e.Message);
+    end;
+  end;
+end;
+
+class function StompUtils.CreateFrameWithBuffer(Buf: TBytes): IStompFrame;
+var
+  headerLine: string;
+  i: Integer;
+  p: Integer;
+  Key, Value: string;
+  other: TBytes;
+  contLen: Integer;
+  sContLen: string;
+begin
+  Result := TStompFrame.Create;
+  i := 1;
+  try
+    Result.Command := TEncoding.UTF8.GetString(GetByteLine(Buf, i)); // convert to string
+    while true do
+    begin
+      headerLine := TEncoding.UTF8.GetString(GetByteLine(Buf, i)); // convert to string
+      if (headerLine = '') then
+        break;
+      p := Pos(':', headerLine);
+      if (p = 0) then
+        raise Exception.Create('header line error');
+      Key := Copy(headerLine, 1, p - 1);
+      Value := Copy(headerLine, p + 1, Length(headerLine) - p);
+      Result.Headers.Add(Key, Value);
+    end;
+    other := Copy(Buf, i, high(Integer));
+    sContLen := Result.Headers.Value(StompHeaders.CONTENT_LENGTH);
+    if (sContLen <> '') then
+    begin
+      if other[Length(other)] <> 0 then
+        raise EStomp.Create('frame no ending');
+      contLen := StrToInt(sContLen);
+      other := Copy(Buf, 1, Length(other) - 1);
+
+      if Length(other) <> contLen then
+        // there is still the command_end
+        raise EStomp.Create('frame too short');
+      Result.BytesBody := other;
+    end
+    else
+    begin
+      Result.BytesBody := Copy(Buf, 1, Length(other) - 1);
     end;
   except
     on EStomp do
