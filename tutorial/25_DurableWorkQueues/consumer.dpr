@@ -10,21 +10,22 @@ program consumer;
 }
 
 uses
-  System.SysUtils, StompClient, StompTypes;
+  System.SysUtils, 
+  StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
-  lClient: TStompClient;
+  lClient: IStompClient;
   lStompFrame: IStompFrame;
   lMessage: string;
 begin
-  lClient := TStompClient.Create;
+  lClient := StompUtils.StompClient;
   lClient.Connect();
   WriteLn('Subscribing to queue "myjobqueue"');
   lClient.Subscribe('/queue/myjobqueue', TAckMode.amClient,
     StompUtils
     .Headers
-    .Add(TStompHeaders.Subscription('12345'))
+    .Add(StompUtils.NewDurableSubscriptionHeader('12345'))
     .Add('persistent', 'true')
     );
 

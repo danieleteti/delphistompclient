@@ -10,14 +10,13 @@ program producer;
 
 uses
   System.SysUtils,
-  StompClient, StompTypes;
+  StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
-  lClient: TStompClient;
-  lFrame: IStompFrame;
+  lClient: IStompClient;
 begin
-  lClient := TStompClient.Create;
+  lClient := StompUtils.StompClient;
   lClient.Connect();
   WriteLn('Sending messages to queue "myqueue"');
   lClient.Send('/queue/myqueue', 'Message 1');

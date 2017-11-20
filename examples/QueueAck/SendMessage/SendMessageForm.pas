@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient, StompTypes,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, StompClient,
   Vcl.ExtCtrls;
 
 type
@@ -20,11 +20,10 @@ type
     AutomaticSendCheckBox: TCheckBox;
     procedure SendMessageButtonClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
     procedure AutomaticSendTimerTimer(Sender: TObject);
     procedure AutomaticSendCheckBoxClick(Sender: TObject);
   private
-    StompClient: TStompClient;
+    StompClient: IStompClient;
     procedure BeforeSendFrame(AFrame: IStompFrame);
     procedure Send;
   public
@@ -57,13 +56,8 @@ end;
 
 procedure TSendMessageMainForm.FormCreate(Sender: TObject);
 begin
-  StompClient := TStompClient.Create;
-  StompClient.OnBeforeSendFrame := BeforeSendFrame;
-end;
-
-procedure TSendMessageMainForm.FormDestroy(Sender: TObject);
-begin
-  StompClient.Free;
+  StompClient := StompUtils.StompClient;
+  StompClient.SetOnBeforeSendFrame(BeforeSendFrame);
 end;
 
 procedure TSendMessageMainForm.AutomaticSendTimerTimer(Sender: TObject);

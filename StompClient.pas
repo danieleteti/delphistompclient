@@ -27,7 +27,6 @@ unit StompClient;
 interface
 
 uses
-  StompTypes,
   SysUtils,
   DateUtils,
 
@@ -43,15 +42,264 @@ uses
   blcksock,
 
 {$ENDIF}
-  Classes;
+  Classes, System.Generics.Collections;
+
+const
+  LINE_END: char = #10;
+  COMMAND_END: char = #0;
+  DEFAULT_STOMP_HOST = '127.0.0.1';
+  DEFAULT_STOMP_PORT = 61613;
 
 type
-  { TStompClient }
+  // Add by GC 26/01/2011
+  IStompClient = interface;
+  IStompFrame = interface;
+
+  // Add by Gc 26/01/2011
+  TStompConnectNotifyEvent = procedure (Client: IStompClient; Frame: IStompFrame) of object;
+
+  TAckMode = (amAuto, amClient, amClientIndividual { STOMP 1.1 } );
+
+  TStompAcceptProtocol = (Ver_1_0, Ver_1_1);
+
+  EStomp = class(Exception)
+  end;
+
+  TKeyValue = class
+  public
+    Key: string;
+    Value: string;
+    constructor Create(const Key: String; const Value: String);
+  end;
+
+//  PKeyValue = ^TKeyValue;
 
   TSenderFrameEvent = procedure(AFrame: IStompFrame) of object;
 
+  StompHeaders = class
+    const
+      MESSAGE_ID:     string = 'message-id';
+      TRANSACTION:    string = 'transaction';
+      REPLY_TO:       string = 'reply-to';
+      AUTO_DELETE:    string = 'auto-delete';
+      CONTENT_LENGTH: string = 'content-length';
+      CONTENT_TYPE:   string = 'content-type';
+      RECEIPT:        string = 'receipt';
+      // RabbitMQ specific headers
+      PREFETCH_COUNT: string = 'prefetch-count';
+      X_MESSAGE_TTL:  string = 'x-message-ttl';
+      X_EXPIRES:      string = 'x-expires';
+      TIMESTAMP:      string = 'timestamp';
+  end;
+
+  IStompHeaders = interface
+    ['{BD087D9D-0576-4C35-88F9-F5D6348E3894}']
+    function Add(Key, Value: string): IStompHeaders; overload;
+    function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
+    function Value(Key: string): string;
+    function Remove(Key: string): IStompHeaders;
+    function IndexOf(Key: string): Integer;
+    function Count: Cardinal;
+    function GetAt(const index: Integer): TKeyValue;
+    function Output: string;
+  end;
+
+  IStompFrame = interface
+    ['{68274885-D3C3-4890-A058-03B769B2191E}']
+    function Output: string;
+    function OutputBytes: TBytes;
+    procedure SetHeaders(const Value: IStompHeaders);
+    function GetCommand: string;
+    procedure SetCommand(const Value: string);
+    function GetBody: string;
+    procedure SetBody(const Value: string);
+    property Body: string read GetBody write SetBody;
+    function GetBytesBody: TBytes;
+    procedure SetBytesBody(const Value: TBytes);
+    property BytesBody: TBytes read GetBytesBody write SetBytesBody;
+    function GetHeaders: IStompHeaders;
+    function MessageID: string;
+    function ContentLength: Integer;
+    function ReplyTo: string;
+    property Headers: IStompHeaders read GetHeaders write SetHeaders;
+    property Command: string read GetCommand write SetCommand;
+  end;
+
+  IStompClient = interface
+    ['{EDE6EF1D-59EE-4FCC-9CD7-B183E606D949}']
+    function Receive(out StompFrame: IStompFrame; ATimeout: Integer)
+      : Boolean; overload;
+    function Receive: IStompFrame; overload;
+    function Receive(ATimeout: Integer): IStompFrame; overload;
+    procedure Receipt(const ReceiptID: string);
+    function SetHost(Host: string): IStompClient;
+    function SetPort(Port: Integer): IStompClient;
+    function SetVirtualHost(VirtualHost: string): IStompClient;
+    function SetClientId(ClientId: string): IStompClient;
+    function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
+    function Connect: IStompClient;
+    function Clone: IStompClient;
+    procedure Disconnect;
+    procedure Subscribe(QueueOrTopicName: string; Ack: TAckMode = amAuto;
+      Headers: IStompHeaders = nil);
+    procedure Unsubscribe(Queue: string; const subscriptionId: string = ''); // Unsubscribe STOMP 1.1 : It requires that the id header matches the id value of previous SUBSCRIBE operation.
+    procedure Send(QueueOrTopicName: string; TextMessage: string;
+      Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; TextMessage: string;
+      TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
+
+    procedure Ack(const MessageID: string; const subscriptionId: string = '';
+      const TransactionIdentifier: string = ''); // ACK  STOMP 1.1 : has two REQUIRED headers: message-id, which MUST contain a value matching the message-id for the MESSAGE being acknowledged and subscription, which MUST be set to match the value of the subscription's id header
+    { ** STOMP 1.1 ** }
+    procedure Nack(const MessageID: string; const subscriptionId: string = ''; // NACK STOMP 1.1 : takes the same headers as ACK: message-id (mandatory), subscription (mandatory) and transaction (OPTIONAL).
+      const TransactionIdentifier: string = '');
+    procedure BeginTransaction(const TransactionIdentifier: string);
+    procedure CommitTransaction(const TransactionIdentifier: string);
+    procedure AbortTransaction(const TransactionIdentifier: string);
+    { ****************************************************************** }
+    Function SetUseSSL(const boUseSSL: boolean;
+      const KeyFile : string =''; const CertFile : string = '';
+      const PassPhrase : string = ''): IStompClient; // SSL
+    function SetPassword(const Value: string): IStompClient;
+    function SetUserName(const Value: string): IStompClient;
+    function SetReceiveTimeout(const AMilliSeconds: Cardinal): IStompClient;
+    function SetHeartBeat(const OutgoingHeartBeats, IncomingHeartBeats: Int64): IStompClient;
+    function Connected: Boolean;
+    function GetProtocolVersion: string;
+    function GetServer: string;
+    function GetSession: string;
+
+    function SetConnectionTimeout(const Value: UInt32): IStompClient;
+    function SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
+    function GetOnConnect: TStompConnectNotifyEvent;
+    procedure SetOnConnect(const Value: TStompConnectNotifyEvent);
+    property OnConnect: TStompConnectNotifyEvent read GetOnConnect write SetOnConnect;
+  end;
+
+  TAddress = record
+    Host: string;
+    Port: Integer;
+    UserName: string;
+    Password: string;
+  end;
+
+  TAddresses = array of TAddress;
+
+  IStompListener = interface
+    ['{CB3EB297-8616-408E-A0B2-7CCC11224DBC}']
+    procedure StopListening;
+    procedure StartListening;
+  end;
+
+  IStompClientListener = interface
+    ['{C4C0D932-8994-43FB-9D32-A03FE86AEFE4}']
+    procedure OnMessage(StompFrame: IStompFrame; var TerminateListener: Boolean);
+    procedure OnListenerStopped(StompClient: IStompClient);
+  end;
+
+  StompUtils = class
+    class function StompClient: IStompClient;
+    class function StompClientAndConnect(Host: string = DEFAULT_STOMP_HOST;
+      Port: Integer = DEFAULT_STOMP_PORT;
+      VirtualHost: string = '';
+      ClientID: string = '';
+      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
+      Ver_1_0): IStompClient;
+    class function NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
+    class function NewPersistentHeader(const Value: Boolean): TKeyValue;
+    class function NewReplyToHeader(const DestinationName: string): TKeyValue;
+    class function CreateListener(const StompClient: IStompClient;
+      const StompClientListener: IStompClientListener): IStompListener;
+    class function StripLastChar(Buf: string; LastChar: char): string;
+    class function CreateFrame: IStompFrame;
+    class function CreateFrameWithBuffer(Buf: string): IStompFrame;
+    class function AckModeToStr(AckMode: TAckMode): string;
+    class function NewHeaders: IStompHeaders; deprecated 'Use Headers instead';
+    class function Headers: IStompHeaders;
+    class function NewFrame: IStompFrame;
+    class function TimestampAsDateTime(const HeaderValue: string): TDateTime;
+  end;
+
+implementation
+
+{$IFDEF FPC}
+const
+  CHAR0 = #0;
+{$ELSE}
+uses
+  // Windows,   // Remove windows unit for compiling on ios
+  IdGlobal,
+  IdGlobalProtocols,
+  Character;
+{$ENDIF}
+
+type
+  TStompFrame = class(TInterfacedObject, IStompFrame)
+  private
+    FCommand: string;
+    FBody: TBytes;
+    FContentLength: Integer;
+    FHeaders: IStompHeaders;
+    procedure SetHeaders(const Value: IStompHeaders);
+    function GetCommand: string;
+    procedure SetCommand(const Value: string);
+    function GetBody: string;
+    procedure SetBody(const Value: string);
+    function GetBytesBody: TBytes;
+    procedure SetBytesBody(const Value: TBytes);
+    function GetHeaders: IStompHeaders;
+
+  public
+    constructor Create;
+    destructor Destroy; override;
+    property Command: string read GetCommand write SetCommand;
+    property Body: string read GetBody write SetBody;
+    property BytesBody: TBytes read GetBytesBody write SetBytesBody;
+    // return '', when Key doesn't exist or Value of Key is ''
+    // otherwise, return Value;
+    function Output: string;
+    function OutputBytes: TBytes;
+    function MessageID: string;
+    function ContentLength: Integer;
+    function ReplyTo: string;
+    property Headers: IStompHeaders read GetHeaders write SetHeaders;
+  end;
+
+  TStompClientListener = class(TInterfacedObject, IStompListener)
+  strict private
+    FReceiverThread: TThread;
+    FTerminated: Boolean;
+  private
+    FStompClientListener: IStompClientListener;
+  strict protected
+    FStompClient: IStompClient;
+  public
+    constructor Create(const StompClient: IStompClient;
+      const StompClientListener: IStompClientListener); virtual;
+    destructor Destroy; override;
+    procedure StartListening;
+    procedure StopListening;
+  end;
+
+  TReceiverThread = class(TThread)
+  private
+    FStompClient: IStompClient;
+    FStompClientListener: IStompClientListener;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(StompClient: IStompClient; StompClientListener: IStompClientListener);
+  end;
+
   THeartBeatThread = class;
 
+  { TStompClient }
   TStompClient = class(TInterfacedObject, IStompClient)
   private
 
@@ -64,8 +312,6 @@ type
     FIOHandlerSocketOpenSSL : TIdSSLIOHandlerSocketOpenSSL;
 {$ENDIF}
     FOnConnect: TStompConnectNotifyEvent; // Add By GC 26/01/2011
-
-
     FHeaders: IStompHeaders;
     FPassword: string;
     FUserName: string;
@@ -81,6 +327,7 @@ type
     FOnAfterSendFrame: TSenderFrameEvent;
     FHost: string;
     FPort: Integer;
+    FVirtualHost: string;
     FClientID: string;
 
     FUseSSL   : boolean;      // SSL
@@ -98,16 +345,12 @@ type
     FServerOutgoingHeartBeats: Int64;
     FOnHeartBeatError: TNotifyEvent;
 
-
-
     procedure ParseHeartBeat(Headers: IStompHeaders);
     procedure SetReceiptTimeout(const Value: Integer);
-    procedure SetConnectionTimeout(const Value: UInt32);
     function GetOnConnect: TStompConnectNotifyEvent;
     procedure SetOnConnect(const Value: TStompConnectNotifyEvent);
 
   protected
-
 {$IFDEF USESYNAPSE}
     procedure SynapseSocketCallBack(Sender: TObject; Reason: THookSocketReason;
       const Value: string);
@@ -117,7 +360,7 @@ type
     procedure DeInit;
     procedure MergeHeaders(var AFrame: IStompFrame;
       var AHeaders: IStompHeaders);
-    procedure SendFrame(AFrame: IStompFrame);
+    procedure SendFrame(AFrame: IStompFrame; AsBytes: boolean = false);
     procedure SendHeartBeat;
     function FormatErrorFrame(const AErrorFrame: IStompFrame): string;
     function ServerSupportsHeartBeat: boolean;
@@ -136,10 +379,12 @@ type
     function Receive: IStompFrame; overload;
     function Receive(ATimeout: Integer): IStompFrame; overload;
     procedure Receipt(const ReceiptID: string);
-    procedure Connect(Host: string = '127.0.0.1';
-      Port: Integer = DEFAULT_STOMP_PORT; ClientID: string = '';
-      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
-      Ver_1_0);
+    function SetHost(Host: string): IStompClient;
+    function SetPort(Port: Integer): IStompClient;
+    function SetVirtualHost(VirtualHost: string): IStompClient;
+    function SetClientId(ClientId: string): IStompClient;
+    function SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
+    function Connect: IStompClient;
     procedure Disconnect;
     procedure Subscribe(QueueOrTopicName: string;
       Ack: TAckMode = TAckMode.amAuto; Headers: IStompHeaders = nil);
@@ -148,8 +393,10 @@ type
       Headers: IStompHeaders = nil); overload;
     procedure Send(QueueOrTopicName: string; TextMessage: string;
       TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
-
-
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      Headers: IStompHeaders = nil); overload;
+    procedure Send(QueueOrTopicName: string; ByteMessage: TBytes;
+      TransactionIdentifier: string; Headers: IStompHeaders = nil); overload;
     procedure Ack(const MessageID: string; const subscriptionId: string = '';
       const TransactionIdentifier: string = ''); // ACK  STOMP 1.1 : has two REQUIRED headers: message-id, which MUST contain a value matching the message-id for the MESSAGE being acknowledged and subscription, which MUST be set to match the value of the subscription's id header
     { STOMP 1.1 }
@@ -160,10 +407,6 @@ type
     procedure AbortTransaction(const TransactionIdentifier: string);
     /// ////////////
     constructor Create; overload; virtual;
-    class function CreateAndConnect(Host: string = '127.0.0.1';
-      Port: Integer = DEFAULT_STOMP_PORT; ClientID: string = '';
-      AcceptVersion: TStompAcceptProtocol = TStompAcceptProtocol.
-      Ver_1_0): IStompClient; overload; virtual;
     destructor Destroy; override;
     function SetHeartBeat(const OutgoingHeartBeats, IncomingHeartBeats: Int64): IStompClient;
     function Clone: IStompClient;
@@ -175,21 +418,13 @@ type
     property ReceiptTimeout: Integer read FReceiptTimeout
       write SetReceiptTimeout;
     property Transactions: TStringList read FTransactions;
-
-
-
-
-
-
-
+    function SetConnectionTimeout(const Value: UInt32): IStompClient;
     property ConnectionTimeout: UInt32 read FConnectionTimeout
-      write SetConnectionTimeout;
+      write FConnectionTimeout;
     // * Manage Events
-    property OnBeforeSendFrame: TSenderFrameEvent read FOnBeforeSendFrame
-      write FOnBeforeSendFrame;
-    property OnAfterSendFrame: TSenderFrameEvent read FOnAfterSendFrame
-      write FOnAfterSendFrame;
-    property OnHeartBeatError: TNotifyEvent read FOnHeartBeatError write FOnHeartBeatError;
+    function SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
+    function SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
 
     // Add by GC 26/01/2001
     property OnConnect: TStompConnectNotifyEvent read GetOnConnect write SetOnConnect;
@@ -210,24 +445,358 @@ type
     property OnHeartBeatError: TNotifyEvent read FOnHeartBeatError write FOnHeartBeatError;
   end;
 
-implementation
+  TStompHeaders = class(TInterfacedObject, IStompHeaders)
+  private
+    FList: TObjectList<TKeyValue>;
+    function GetItems(index: Cardinal): TKeyValue;
+    procedure SetItems(index: Cardinal; const Value: TKeyValue);
 
-{$IFDEF FPC}
+  public
+    class function NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
+      deprecated 'Use Subscription instead';
+    class function NewPersistentHeader(const Value: Boolean): TKeyValue;
+      deprecated 'Use Persistent instead';
+    class function NewReplyToHeader(const DestinationName: string): TKeyValue;
+      deprecated 'Use ReplyTo instead';
 
+    class function Subscription(const SubscriptionName: string): TKeyValue;
+    class function Persistent(const Value: Boolean): TKeyValue;
+    class function Durable(const Value: Boolean): TKeyValue;
+    class function ReplyTo(const DestinationName: string): TKeyValue;
+    /// /
+    function Add(Key, Value: string): IStompHeaders; overload;
+    function Add(HeaderItem: TKeyValue): IStompHeaders; overload;
+    function Value(Key: string): string;
+    function Remove(Key: string): IStompHeaders;
+    function IndexOf(Key: string): Integer;
+    function Count: Cardinal;
+    function GetAt(const index: Integer): TKeyValue;
+    constructor Create;
+    destructor Destroy; override;
+    function Output: string;
+    property Items[index: Cardinal]: TKeyValue read GetItems
+      write SetItems; default;
+  end;
 
-const
-  CHAR0 = #0;
+class function TStompHeaders.NewDurableSubscriptionHeader(const SubscriptionName
+  : string): TKeyValue;
+begin
+  Result := Subscription(SubscriptionName);
+end;
 
-{$ELSE}
+class function TStompHeaders.NewPersistentHeader(const Value: Boolean)
+  : TKeyValue;
+begin
+  Result := Persistent(Value);
+end;
 
+class function TStompHeaders.NewReplyToHeader(const DestinationName: string)
+  : TKeyValue;
+begin
+  Result := ReplyTo(DestinationName);
+end;
 
-uses
-  // Windows,   // Remove windows unit for compiling on ios
-  IdGlobal,
-  IdGlobalProtocols,
-  Character, Winapi.Windows;
+constructor TStompFrame.Create;
+begin
+  FHeaders := TStompHeaders.Create;
+  self.FCommand := '';
+  SetLength(self.FBody, 0);
+  self.FContentLength := 0;
+end;
 
-{$ENDIF}
+destructor TStompFrame.Destroy;
+begin
+  inherited;
+end;
+
+function TStompFrame.GetBody: string;
+begin
+  Result := TEncoding.UTF8.GetString(FBody);
+end;
+
+function TStompFrame.GetBytesBody: TBytes;
+begin
+  Result := FBody;
+end;
+
+function TStompFrame.GetCommand: string;
+begin
+  Result := FCommand;
+end;
+
+function TStompFrame.GetHeaders: IStompHeaders;
+begin
+  Result := FHeaders;
+end;
+
+function TStompFrame.MessageID: string;
+begin
+  Result := self.GetHeaders.Value(StompHeaders.MESSAGE_ID);
+end;
+
+function TStompFrame.Output: string;
+begin
+  Result := FCommand + LINE_END + FHeaders.Output + LINE_END + GetBody +
+    COMMAND_END;
+end;
+
+function TStompFrame.OutputBytes: TBytes;
+begin
+  Result := TEncoding.UTF8.GetBytes(FCommand + LINE_END + FHeaders.Output + LINE_END)
+    + GetBytesBody + TEncoding.UTF8.GetBytes(COMMAND_END);
+end;
+
+function TStompFrame.ReplyTo: string;
+begin
+  Result := self.GetHeaders.Value(StompHeaders.REPLY_TO);
+end;
+
+function TStompFrame.ContentLength: Integer;
+begin
+  Result := FContentLength;
+end;
+
+procedure TStompFrame.SetBody(const Value: string);
+begin
+  SetBytesBody(TEncoding.UTF8.GetBytes(Value));
+end;
+
+procedure TStompFrame.SetBytesBody(const Value: TBytes);
+begin
+  FBody := Value;
+  FContentLength := Length(FBody);
+end;
+
+procedure TStompFrame.SetCommand(const Value: string);
+begin
+  FCommand := Value;
+end;
+
+procedure TStompFrame.SetHeaders(const Value: IStompHeaders);
+begin
+  FHeaders := Value;
+end;
+
+function GetLine(Buf: string; var From: Integer): string;
+var
+  i: Integer;
+begin
+  if (From > Length(Buf)) then
+    raise EStomp.Create('From out of bound.');
+
+  i := From;
+
+  while (i <= Length(Buf)) do
+  begin
+    if (Buf[i] <> LINE_END) then
+      inc(i)
+    else
+      break;
+  end;
+
+  if (Buf[i] = LINE_END) then
+  begin
+    Result := Copy(Buf, From, i - From);
+    From := i + 1;
+    exit;
+  end
+  else
+    raise EStomp.Create('End of Line not found.');
+end;
+
+{ TStompHeaders }
+
+function TStompHeaders.Add(Key, Value: string): IStompHeaders;
+begin
+  FList.Add(TKeyValue.Create(Key, Value));
+  Result := self;
+end;
+
+function TStompHeaders.Add(HeaderItem: TKeyValue): IStompHeaders;
+begin
+  Result := Add(HeaderItem.Key, HeaderItem.Value);
+end;
+
+function TStompHeaders.Count: Cardinal;
+begin
+  Result := FList.Count;
+end;
+
+constructor TStompHeaders.Create;
+begin
+  inherited;
+  FList := TObjectList<TKeyValue>.Create(true);
+end;
+
+destructor TStompHeaders.Destroy;
+begin
+  FList.Free;
+  inherited;
+end;
+
+class function TStompHeaders.Durable(const Value: Boolean): TKeyValue;
+begin
+  Result := TKeyValue.Create('durable', LowerCase(BoolToStr(Value, true)));
+end;
+
+function TStompHeaders.GetAt(const index: Integer): TKeyValue;
+begin
+  Result := GetItems(index)
+end;
+
+function TStompHeaders.GetItems(index: Cardinal): TKeyValue;
+begin
+  Result := FList[index];
+end;
+
+function TStompHeaders.IndexOf(Key: string): Integer;
+var
+  i: Integer;
+begin
+  Result := -1;
+  for i := 0 to FList.Count - 1 do
+  begin
+    if GetItems(i).Key = Key then
+    begin
+      Result := i;
+      break;
+    end;
+  end;
+end;
+
+function TStompHeaders.Output: string;
+var
+  i: Integer;
+  kv: TKeyValue;
+begin
+  Result := '';
+  if FList.Count > 0 then
+    for i := 0 to FList.Count - 1 do
+    begin
+      kv := Items[i];
+      Result := Result + kv.Key + ':' + kv.Value + LINE_END;
+    end
+  else
+    Result := LINE_END;
+end;
+
+class function TStompHeaders.Persistent(const Value: Boolean): TKeyValue;
+begin
+  Result := TKeyValue.Create('persistent', LowerCase(BoolToStr(Value, true)));
+end;
+
+function TStompHeaders.Remove(Key: string): IStompHeaders;
+var
+  p: Integer;
+begin
+  p := IndexOf(Key);
+  FList.Delete(p);
+  Result := self;
+end;
+
+class function TStompHeaders.ReplyTo(const DestinationName: string): TKeyValue;
+begin
+  Result := TKeyValue.Create('reply-to', DestinationName);
+end;
+
+procedure TStompHeaders.SetItems(index: Cardinal; const Value: TKeyValue);
+var
+  p: Integer;
+begin
+  p := IndexOf(Value.Key);
+  FList[p].Free;
+  FList[p] := Value;
+end;
+
+class function TStompHeaders.Subscription(
+  const SubscriptionName: string): TKeyValue;
+begin
+  Result := TKeyValue.Create('id', SubscriptionName);
+end;
+
+function TStompHeaders.Value(Key: string): string;
+var
+  i: Integer;
+begin
+  Result := '';
+  i := IndexOf(Key);
+  if i > -1 then
+    Result := GetItems(i).Value;
+end;
+
+{ TStompListener }
+
+constructor TStompClientListener.Create(const StompClient: IStompClient;
+  const StompClientListener: IStompClientListener);
+begin
+  FStompClientListener := StompClientListener;
+  FStompClient := StompClient;
+  FTerminated := False;
+  FReceiverThread := nil;
+  inherited Create;
+end;
+
+destructor TStompClientListener.Destroy;
+begin
+  FTerminated := true;
+  FReceiverThread.Free;
+  inherited;
+end;
+
+procedure TStompClientListener.StartListening;
+begin
+  if Assigned(FReceiverThread) then
+    raise EStomp.Create('Already listening');
+  FReceiverThread := TReceiverThread.Create(FStompClient, FStompClientListener);
+  FReceiverThread.Start;
+end;
+
+procedure TStompClientListener.StopListening;
+begin
+  if not Assigned(FReceiverThread) then
+    exit;
+  FReceiverThread.Terminate;
+  FReceiverThread.Free;
+  FReceiverThread := nil;
+end;
+
+{ TReceiverThread }
+
+constructor TReceiverThread.Create(StompClient: IStompClient;
+  StompClientListener: IStompClientListener);
+begin
+  inherited Create(true);
+  FStompClient := StompClient;
+  FStompClientListener := StompClientListener;
+end;
+
+procedure TReceiverThread.Execute;
+var
+  LFrame: IStompFrame;
+  LTerminateListener: Boolean;
+begin
+  try
+    LTerminateListener := False;
+    while (not Terminated) and (not LTerminateListener) do
+    begin
+      if FStompClient.Receive(LFrame, 1000) then
+      begin
+        TThread.Synchronize(nil,
+          procedure
+          begin
+            FStompClientListener.OnMessage(LFrame, LTerminateListener);
+          end);
+      end;
+    end;
+  finally
+    TThread.Synchronize(nil,
+      procedure
+      begin
+        FStompClientListener.OnListenerStopped(FStompClient);
+      end);
+  end;
+end;
+
 { TStompClient }
 
 procedure TStompClient.AbortTransaction(const TransactionIdentifier: string);
@@ -256,7 +825,7 @@ var
 begin
   Frame := TStompFrame.Create;
   Frame.Command := 'ACK';
-  Frame.Headers.Add(TStompHeaders.MESSAGE_ID, MessageID);
+  Frame.Headers.Add(StompHeaders.MESSAGE_ID, MessageID);
 
   if subscriptionId <> '' then
     Frame.Headers.Add('subscription', subscriptionId);
@@ -304,11 +873,17 @@ end;
 function TStompClient.Clone: IStompClient;
 begin
   Result := TStompClient.Create;
-  Result.SetUserName(FUserName).SetPassword(FPassword);
-  TStompClient(Result).ConnectionTimeout := FConnectionTimeout;
-  TStompClient(Result).SetHeartBeat(FOutgoingHeartBeats, FIncomingHeartBeats);
-  TStompClient(Result).Connect(FHost, FPort, FClientID, FAcceptVersion);
-
+  Result
+    .SetUserName(FUserName)
+    .SetPassword(FPassword)
+    .SetConnectionTimeout(FConnectionTimeout)
+    .SetHeartBeat(FOutgoingHeartBeats, FIncomingHeartBeats)
+    .SetHost(FHost)
+    .SetPort(FPort)
+    .SetVirtualHost(FVirtualHost)
+    .SetClientID(FClientId)
+    .SetAcceptVersion(FAcceptVersion)
+    .Connect;
 end;
 
 procedure TStompClient.CommitTransaction(const TransactionIdentifier: string);
@@ -330,28 +905,49 @@ begin
       [TransactionIdentifier]);
 end;
 
-procedure TStompClient.Connect(Host: string; Port: Integer; ClientID: string;
-  AcceptVersion: TStompAcceptProtocol);
+function TStompClient.SetHost(Host: string): IStompClient;
+begin
+  FHost := Host;
+  Result := Self;
+end;
+
+function TStompClient.SetPort(Port: Integer): IStompClient;
+begin
+  FPort := Port;
+  Result := Self;
+end;
+
+function TStompClient.SetVirtualHost(VirtualHost: string): IStompClient;
+begin
+  FVirtualHost := VirtualHost;
+  Result := Self;
+end;
+
+function TStompClient.SetClientId(ClientId: string): IStompClient;
+begin
+  FClientId := ClientId;
+  Result := Self;
+end;
+
+function TStompClient.SetAcceptVersion(AcceptVersion: TStompAcceptProtocol): IStompClient;
+begin
+  FAcceptVersion := AcceptVersion;
+  Result := Self;
+end;
+
+function TStompClient.Connect: IStompClient;
 var
   Frame: IStompFrame;
   lHeartBeat: string;
 begin
-  FHost := Host;
-  FPort := Port;
-  FClientID := ClientID;
-  FAcceptVersion := AcceptVersion;
-
   try
     Init;
 
 {$IFDEF USESYNAPSE}
     FSynapseConnected := False;
-    FSynapseTCP.Connect(Host, intToStr(Port));
+    FSynapseTCP.Connect(FHost, intToStr(FPort));
     FSynapseConnected := True;
-
 {$ELSE}
-
-
     if FUseSSL then
     begin
       FIOHandlerSocketOpenSSL.OnGetPassword := OpenSSLGetPassword;
@@ -372,14 +968,14 @@ begin
     end;
 
     FTCP.ConnectTimeout := FConnectionTimeout;
-    FTCP.Connect(Host, Port);
+    FTCP.Connect(FHost, FPort);
     FTCP.IOHandler.MaxLineLength := MaxInt;
-
 {$ENDIF}
+
     Frame := TStompFrame.Create;
     Frame.Command := 'CONNECT';
 
-    FClientAcceptProtocolVersion := AcceptVersion;
+    FClientAcceptProtocolVersion := FAcceptVersion;
     if TStompAcceptProtocol.Ver_1_1 in [FClientAcceptProtocolVersion]
     then
     begin
@@ -392,11 +988,15 @@ begin
       Frame.Headers.Add('accept-version', '1.0'); // stomp 1.0
     end;
 
-    Frame.Headers.Add('login', FUserName).Add('passcode', FPassword);
-    FClientID := ClientID;
-    if ClientID <> '' then
+    if FVirtualHost <> '' then
     begin
-      Frame.Headers.Add('client-id', ClientID);
+      Frame.Headers.Add('host', FVirtualHost);
+    end;
+
+    Frame.Headers.Add('login', FUserName).Add('passcode', FPassword);
+    if FClientID <> '' then
+    begin
+      Frame.Headers.Add('client-id', FClientID);
     end;
     SendFrame(Frame);
     Frame := nil;
@@ -431,6 +1031,8 @@ begin
       raise EStomp.Create(E.message);
     end;
   end;
+
+  Result := Self;
 end;
 
 function TStompClient.Connected: boolean;
@@ -443,13 +1045,6 @@ begin
   Result := Assigned(FTCP) and FTCP.Connected and (not FTCP.IOHandler.ClosedGracefully);
 
 {$ENDIF}
-end;
-
-class function TStompClient.CreateAndConnect(Host: string; Port: Integer;
-  ClientID: string; AcceptVersion: TStompAcceptProtocol): IStompClient;
-begin
-  Result := TStompClient.Create;
-  Result.Connect(Host, Port, ClientID, AcceptVersion);
 end;
 
 constructor TStompClient.Create;
@@ -467,6 +1062,12 @@ begin
   FConnectionTimeout := 1000 * 10; // 10secs
   FIncomingHeartBeats := 10000; // 10secs
   FOutgoingHeartBeats := 0; // disabled
+
+  FHost := '127.0.0.1';
+  FPort := DEFAULT_STOMP_PORT;
+  FVirtualHost := '';
+  FClientID := '';
+  FAcceptVersion := TStompAcceptProtocol.Ver_1_0;
 end;
 
 procedure TStompClient.DeInit;
@@ -578,8 +1179,6 @@ begin
 end;
 
 {$IFDEF USESYNAPSE}
-
-
 procedure TStompClient.SynapseSocketCallBack(Sender: TObject;
   Reason: THookSocketReason; const Value: string);
 begin
@@ -590,9 +1189,7 @@ begin
     FSynapseConnected := False;
   end;
 end;
-
 {$ENDIF}
-
 
 procedure TStompClient.MergeHeaders(var AFrame: IStompFrame;
   var AHeaders: IStompHeaders);
@@ -870,26 +1467,21 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
             raise;
         end;
       end;
-      Result := StompUtils.CreateFrame(lSBuilder.toString);
+      Result := StompUtils.CreateFrameWithBuffer(lSBuilder.toString);
       if Result.Command = 'ERROR' then
         raise EStomp.Create(FormatErrorFrame(Result));
     finally
       lSBuilder.Free;
     end;
   end;
-
 {$ENDIF}
-
 
 begin
 {$IFDEF USESYNAPSE}
   Result := InternalReceiveSynapse(ATimeout);
-
 {$ELSE}
   Result := InternalReceiveINDY(ATimeout);
-
 {$ENDIF}
-
 end;
 
 function TStompClient.Receive: IStompFrame;
@@ -924,8 +1516,35 @@ begin
   SendFrame(Frame);
 end;
 
+procedure TStompClient.Send(QueueOrTopicName: string; ByteMessage: TBytes;
+  Headers: IStompHeaders);
+var
+  Frame: IStompFrame;
+begin
+  Frame := TStompFrame.Create;
+  Frame.Command := 'SEND';
+  Frame.Headers.Add('destination', QueueOrTopicName);
+  Frame.BytesBody := ByteMessage;
+  MergeHeaders(Frame, Headers);
+  SendFrame(Frame, true);
+end;
 
-procedure TStompClient.SendFrame(AFrame: IStompFrame);
+procedure TStompClient.Send(QueueOrTopicName: string; ByteMessage: TBytes;
+  TransactionIdentifier: string; Headers: IStompHeaders);
+var
+  Frame: IStompFrame;
+begin
+  Frame := TStompFrame.Create;
+  Frame.Command := 'SEND';
+  Frame.Headers.Add('destination', QueueOrTopicName);
+  Frame.Headers.Add('transaction', TransactionIdentifier);
+  Frame.BytesBody := ByteMessage;
+  MergeHeaders(Frame, Headers);
+  SendFrame(Frame, true);
+end;
+
+
+procedure TStompClient.SendFrame(AFrame: IStompFrame; AsBytes: boolean = false);
 begin
   TMonitor.Enter(FLock);
   Try
@@ -934,7 +1553,10 @@ begin
       {$IFDEF USESYNAPSE}
           if Assigned(FOnBeforeSendFrame) then
             FOnBeforeSendFrame(AFrame);
-          FSynapseTCP.SendString(AFrame.output);
+          if AsBytes then
+            FSynapseTCP.SendBytes(AFrame.OutputBytes)
+          else
+            FSynapseTCP.SendString(AFrame.Output);
           if Assigned(FOnAfterSendFrame) then
             FOnAfterSendFrame(AFrame);
       {$ELSE}
@@ -943,10 +1565,16 @@ begin
             FOnBeforeSendFrame(AFrame);
 
       {$IF CompilerVersion < 25}
-          FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
+          if AsBytes then
+            FTCP.IOHandler.Write(AFrame.OutputBytes)
+          else
+            FTCP.IOHandler.write(TEncoding.UTF8.GetBytes(AFrame.output));
       {$IFEND}
       {$IF CompilerVersion >= 25}
-          FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
+          if AsBytes then
+            FTCP.IOHandler.Write(TIdBytes(AFrame.OutputBytes))
+          else
+            FTCP.IOHandler.write(IndyTextEncoding_UTF8.GetBytes(AFrame.output));
       {$IFEND}
 
           if Assigned(FOnAfterSendFrame) then
@@ -988,9 +1616,10 @@ begin
   Result := (FServerProtocolVersion = '1.1') and (FServerOutgoingHeartBeats > 0)
 end;
 
-procedure TStompClient.SetConnectionTimeout(const Value: UInt32);
+function TStompClient.SetConnectionTimeout(const Value: UInt32): IStompClient;
 begin
   FConnectionTimeout := Value;
+  Result := Self;
 end;
 
 function TStompClient.SetHeartBeat(const OutgoingHeartBeats, IncomingHeartBeats: Int64)
@@ -1001,13 +1630,27 @@ begin
   Result := Self;
 end;
 
+function TStompClient.SetOnAfterSendFrame(const Value: TSenderFrameEvent): IStompClient;
+begin
+  FOnAfterSendFrame := Value;
+  Result := Self;
+end;
 
-
-
+function TStompClient.SetOnBeforeSendFrame(const Value: TSenderFrameEvent): IStompClient;
+begin
+  FOnBeforeSendFrame := Value;
+  Result := Self;
+end;
 
 procedure TStompClient.SetOnConnect(const Value: TStompConnectNotifyEvent);
 begin
   FOnConnect := Value;
+end;
+
+function TStompClient.SetOnHeartBeatError(const Value: TNotifyEvent): IStompClient;
+begin
+  FOnHeartBeatError := Value;
+  Result := Self;
 end;
 
 function TStompClient.SetPassword(const Value: string): IStompClient;
@@ -1119,6 +1762,164 @@ begin
       FStompClient.SendHeartBeat;
     end;
   end;
+end;
+
+{ StompUtils }
+
+class function StompUtils.StompClient: IStompClient;
+begin
+  Result := TStompClient.Create;
+end;
+
+class function StompUtils.StompClientAndConnect(Host: string; Port: Integer;
+  VirtualHost: string; ClientID: string;
+  AcceptVersion: TStompAcceptProtocol): IStompClient;
+begin
+  Result := Self.StompClient
+                .SetHost(Host)
+                .SetPort(Port)
+                .SetVirtualHost(VirtualHost)
+                .SetClientID(ClientID)
+                .SetAcceptVersion(AcceptVersion)
+                .Connect;
+end;
+
+class function StompUtils.NewDurableSubscriptionHeader(const SubscriptionName: string): TKeyValue;
+begin
+  Result := TStompHeaders.Subscription(SubscriptionName);
+end;
+
+class function StompUtils.NewPersistentHeader(const Value: Boolean): TKeyValue;
+begin
+  Result := TStompHeaders.Persistent(Value);
+end;
+
+class function StompUtils.NewReplyToHeader(const DestinationName: string): TKeyValue;
+begin
+  Result := TStompHeaders.ReplyTo(DestinationName);
+end;
+
+class function StompUtils.CreateListener(const StompClient: IStompClient;
+  const StompClientListener: IStompClientListener): IStompListener;
+begin
+  Result := TStompClientListener.Create(StompClient, StompClientListener);
+end;
+
+class function StompUtils.StripLastChar(Buf: string; LastChar: char): string;
+var
+  p: Integer;
+begin
+  p := Pos(COMMAND_END, Buf);
+  if (p = 0) then
+    raise EStomp.Create('frame no ending');
+  Result := Copy(Buf, 1, p - 1);
+end;
+
+class function StompUtils.TimestampAsDateTime(const HeaderValue: string)
+  : TDateTime;
+begin
+  Result := EncodeDateTime(1970, 1, 1, 0, 0, 0, 0) + StrToInt64(HeaderValue)
+    / 86400000;
+end;
+
+class function StompUtils.AckModeToStr(AckMode: TAckMode): string;
+begin
+  case AckMode of
+    amAuto:
+      Result := 'auto';
+    amClient:
+      Result := 'client';
+    amClientIndividual:
+      Result := 'client-individual'; // stomp 1.1
+  else
+    raise EStomp.Create('Unknown AckMode');
+  end;
+end;
+
+class function StompUtils.NewHeaders: IStompHeaders;
+begin
+  Result := Headers;
+end;
+
+class function StompUtils.CreateFrame: IStompFrame;
+begin
+  Result := TStompFrame.Create;
+end;
+
+class function StompUtils.CreateFrameWithBuffer(Buf: string): IStompFrame;
+var
+  line: string;
+  i: Integer;
+  p: Integer;
+  Key, Value: string;
+  other: string;
+  contLen: Integer;
+  sContLen: string;
+begin
+  Result := TStompFrame.Create;
+  i := 1;
+  try
+    Result.Command := GetLine(Buf, i);
+    while true do
+    begin
+      line := GetLine(Buf, i);
+      if (line = '') then
+        break;
+      p := Pos(':', line);
+      if (p = 0) then
+        raise Exception.Create('header line error');
+      Key := Copy(line, 1, p - 1);
+      Value := Copy(line, p + 1, Length(line) - p);
+      Result.Headers.Add(Key, Value);
+    end;
+    other := Copy(Buf, i, high(Integer));
+    sContLen := Result.Headers.Value('content-length');
+    if (sContLen <> '') then
+    begin
+      if other[Length(other)] <> #0 then
+        raise EStomp.Create('frame no ending');
+      contLen := StrToInt(sContLen);
+      other := StripLastChar(other, COMMAND_END);
+
+      if TEncoding.UTF8.GetByteCount(other) <> contLen then
+        // there is still the command_end
+        raise EStomp.Create('frame too short');
+      Result.Body := other;
+    end
+    else
+    begin
+      Result.Body := StripLastChar(other, COMMAND_END)
+    end;
+  except
+    on EStomp do
+    begin
+      // ignore
+      Result := nil;
+    end;
+    on e: Exception do
+    begin
+      Result := nil;
+      raise EStomp.Create(e.Message);
+    end;
+  end;
+end;
+
+class function StompUtils.Headers: IStompHeaders;
+begin
+  Result := TStompHeaders.Create;
+end;
+
+class function StompUtils.NewFrame: IStompFrame;
+begin
+  Result := TStompFrame.Create;
+end;
+
+
+constructor TKeyValue.Create(const Key: String; const Value: String);
+begin
+  inherited Create;
+  Self.Key := Key;
+  Self.Value := Value;
 end;
 
 end.

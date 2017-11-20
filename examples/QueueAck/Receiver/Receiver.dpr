@@ -2,8 +2,9 @@ program Receiver;
 
 uses
   Vcl.Forms,
-  ReceiverForm in 'ReceiverForm.pas' {ReceiverMainForm} ,
-  ThreadReceiver in 'ThreadReceiver.pas';
+  ReceiverForm in 'ReceiverForm.pas' {ReceiverMainForm},
+  ThreadReceiver in 'ThreadReceiver.pas',
+  StompClient in '..\..\..\StompClient.pas';
 
 {$R *.res}
 

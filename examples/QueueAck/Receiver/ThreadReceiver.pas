@@ -4,15 +4,14 @@ interface
 
 uses
   System.Classes,
-  StompClient,
-  StompTypes;
+  StompClient;
 
 type
   TThreadReceiver = class(TThread)
   private
-    FStompClient: TStompClient;
+    FStompClient: IStompClient;
     FStompFrame: IStompFrame;
-    procedure SetStompClient(const Value: TStompClient);
+    procedure SetStompClient(const Value: IStompClient);
   protected
     procedure Execute; override;
   public
@@ -20,7 +19,7 @@ type
     procedure UpdateMessageMemo;
     procedure UpdateMessageIdEdit;
     constructor Create(CreateSuspended: Boolean); overload;
-    property StompClient: TStompClient read FStompClient write SetStompClient;
+    property StompClient: IStompClient read FStompClient write SetStompClient;
   end;
 
 implementation
@@ -62,7 +61,7 @@ uses ReceiverForm, System.SysUtils;
 
 constructor TThreadReceiver.Create(CreateSuspended: Boolean);
 begin
-  FStompFrame := TStompFrame.Create;
+  FStompFrame := StompUtils.CreateFrame;
   inherited Create(CreateSuspended);
 end;
 
@@ -91,7 +90,7 @@ begin
     StringReplace(FStompFrame.Output, #10, sLineBreak, [rfReplaceAll]));
 end;
 
-procedure TThreadReceiver.SetStompClient(const Value: TStompClient);
+procedure TThreadReceiver.SetStompClient(const Value: IStompClient);
 begin
   FStompClient := Value;
 end;

@@ -9,14 +9,15 @@ program consumer;
 }
 
 uses
-  System.SysUtils, StompClient, StompTypes;
+  System.SysUtils, 
+  StompClient in '..\..\StompClient.pas';
 
 procedure Main;
 var
   lClient: IStompClient;
   lStompFrame: IStompFrame;
 begin
-  lClient := TStompClient.Create;
+  lClient := StompUtils.StompClient;
   lClient.Connect();
   WriteLn('Subscribing to queue "myqueue"');
   lClient.Subscribe('/queue/myqueue');
