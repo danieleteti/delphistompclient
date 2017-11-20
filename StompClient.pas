@@ -1482,7 +1482,10 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
           end
           else
           begin
-            FTCP.Socket.ReadStream(SStream);
+            if ContentLength > 0 then
+              FTCP.Socket.ReadStream(SStream, ContentLength, true)
+            else
+              FTCP.Socket.ReadStream(SStream, -1, true);
             AsBytes := true;
           end;
         finally
