@@ -28,7 +28,7 @@ begin
 
   if lClient.Receive(lStompFrame, 5000) then
   begin
-    WriteLn(lStompFrame.GetBody);
+    WriteLn('MESSAGE: ' + lStompFrame.GetBody);
   end
   else
   begin
@@ -39,7 +39,7 @@ begin
     StringOfChar('*', 40));
   if lClient.Receive(lStompFrame, 5000) then
   begin
-    WriteLn(lStompFrame.GetBody);
+    WriteLn('MESSAGE: ' + lStompFrame.GetBody);
   end
   else
     WriteLn('Cannot read message after timeout...');

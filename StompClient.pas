@@ -65,7 +65,7 @@ type
   EStomp = class(Exception)
   end;
 
-  TKeyValue = class
+  TKeyValue = record
   public
     Key: string;
     Value: string;
@@ -447,7 +447,7 @@ type
 
   TStompHeaders = class(TInterfacedObject, IStompHeaders)
   private
-    FList: TObjectList<TKeyValue>;
+    FList: TList<TKeyValue>;
     function GetItems(index: Cardinal): TKeyValue;
     procedure SetItems(index: Cardinal; const Value: TKeyValue);
 
@@ -625,7 +625,7 @@ end;
 constructor TStompHeaders.Create;
 begin
   inherited;
-  FList := TObjectList<TKeyValue>.Create(true);
+  FList := TList<TKeyValue>.Create;
 end;
 
 destructor TStompHeaders.Destroy;
@@ -707,7 +707,7 @@ var
   p: Integer;
 begin
   p := IndexOf(Value.Key);
-  FList[p].Free;
+//  FList[p].Free;
   FList[p] := Value;
 end;
 
@@ -1921,9 +1921,10 @@ end;
 
 constructor TKeyValue.Create(const Key: String; const Value: String);
 begin
-  inherited Create;
+//  inherited Create;
   Self.Key := Key;
   Self.Value := Value;
 end;
 
 end.
+

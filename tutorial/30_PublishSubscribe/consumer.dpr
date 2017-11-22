@@ -19,7 +19,7 @@ var
   lMessage: string;
 begin
   lClient := StompUtils.StompClient
-               .SetHeartBeat(0, 0)
+               .SetHeartBeat(1000, 1000)
                .SetAcceptVersion(TStompAcceptProtocol.Ver_1_1)
                .Connect;
   WriteLn('Subscribing to queue "myjobqueue"');

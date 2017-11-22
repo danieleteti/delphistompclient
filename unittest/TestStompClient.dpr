@@ -7,13 +7,13 @@ program TestStompClient;
 {$ENDIF}
 
 uses
-{$IFDEF FPC}
-{$IFDEF UNIX}
+  {$IFDEF FPC}
+  {$IFDEF UNIX}
   cthreads,
-{$ENDIF }
-{$ENDIF }
+  {$ENDIF }
+  {$ENDIF }
   SysUtils,
-  StompClient;
+  StompClient in '..\StompClient.pas';
 
 procedure Example_Durable_Subscription;
 var
@@ -204,8 +204,8 @@ var
 
 begin
   // yes, this should become a proper DUnitX project...
+  lFail := False;
   try
-    lFail := False;
     for TestItem in TestItems do
     begin
       try
