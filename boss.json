@@ -1,0 +1,9 @@
+{
+	"name": "delphistompclient",
+	"description": "STOMP client for Embarcadero Delphi and FreePascal.",
+	"version": "1.0.0",
+	"homepage": "https://github.com/danieleteti/delphistompclient",
+	"mainsrc": "./",
+	"projects": [],
+	"dependencies": {}
+}

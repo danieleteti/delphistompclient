@@ -3,3 +3,4 @@
 *.exe
 *.local
 *.identcache
+/boss-lock.json
