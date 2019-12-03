@@ -1392,7 +1392,6 @@ function TStompClient.Receive(ATimeout: Integer): IStompFrame;
       FTCP.Socket.ReadTimeout := ATimeout;
       FTCP.Socket.DefStringEncoding :=
 {$IF CompilerVersion < 24}TIdTextEncoding.UTF8{$ELSE}IndyTextEncoding_UTF8{$ENDIF};
-      AsBytes := true;
 
       try
         lTimestampFirstReadLn := Now;
