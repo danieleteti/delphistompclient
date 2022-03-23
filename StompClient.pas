@@ -1,4 +1,4 @@
-// Stomp Client for Embarcadero Delphi & FreePasca
+// Stomp Client for Embarcadero Delphi & FreePascal
 // Tested With ApacheMQ 5.2/5.3, Apache Apollo 1.2, RabbitMQ
 // Copyright (c) 2009-2017 Daniele Teti
 //
@@ -50,6 +50,7 @@ const
   COMMAND_END: char = #0;
   DEFAULT_STOMP_HOST = '127.0.0.1';
   DEFAULT_STOMP_PORT = 61613;
+  DEFAULT_STOMP_TLS_PORT = 61614;
 
 type
   // Add by GC 26/01/2011
@@ -162,7 +163,7 @@ type
     procedure CommitTransaction(const TransactionIdentifier: string);
     procedure AbortTransaction(const TransactionIdentifier: string);
     { ****************************************************************** }
-    Function SetUseSSL(const boUseSSL: boolean;
+    Function SetUseSSL(const boUseSSL: boolean; const PassThrough: Boolean = True;
       const KeyFile : string =''; const CertFile : string = '';
       const PassPhrase : string = ''): IStompClient; // SSL
     function SetPassword(const Value: string): IStompClient;
@@ -336,6 +337,7 @@ type
     FsslKeyFile : string;     // SSL
     FsslCertFile : string;    // SSL
     FsslKeyPass   : string;   // SSL
+    FPassThrough : Boolean;   // SSL
 
     FAcceptVersion: TStompAcceptProtocol;
     FConnectionTimeout: UInt32;
@@ -370,7 +372,7 @@ type
     procedure DoHeartBeatErrorHandler;
     procedure OpenSSLGetPassword(var Password: String);
   public
-    Function SetUseSSL(const boUseSSL: boolean;
+    Function SetUseSSL(const boUseSSL: boolean; const PassThrough: Boolean = True;
       const KeyFile : string =''; const CertFile : string = '';
       const PassPhrase : string = ''): IStompClient; // SSL
 
@@ -989,6 +991,7 @@ begin
       FIOHandlerSocketOpenSSL.SSLOptions.VerifyMode := [];
       FIOHandlerSocketOpenSSL.SSLOptions.VerifyDepth := 0;
 //      FIOHandlerSocketOpenSSL.OnBeforeConnect := BeforeConnect;
+      FIOHandlerSocketOpenSSL.PassThrough := FPassThrough;
       FTCP.IOHandler := FIOHandlerSocketOpenSSL;
     end
     else
@@ -1728,13 +1731,14 @@ begin
   Result := Self;
 end;
 
-function TStompClient.SetUseSSL(const boUseSSL: boolean; const KeyFile,
+function TStompClient.SetUseSSL(const boUseSSL: boolean; const PassThrough:Boolean; const KeyFile,
   CertFile, PassPhrase: string): IStompClient;
 begin
   FUseSSL := boUseSSL;
   FsslKeyFile   := KeyFile;
   FsslCertFile := CertFile;
   FsslKeyPass  := PassPhrase;
+  FPassThrough := PassThrough;
   Result := Self;
 
 end;
